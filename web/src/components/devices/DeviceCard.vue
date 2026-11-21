@@ -3,7 +3,8 @@ import { Lock, Pencil, TimerIcon, TriangleAlert } from '@lucide/vue'
 import { useQueryClient } from '@tanstack/vue-query'
 import { computed, nextTick, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { Button } from '@/components/ui/button'
+import { RouterLink } from 'vue-router'
+import { Button, buttonVariants } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { confirm } from '@/composables/useConfirm'
@@ -122,6 +123,7 @@ const mmss = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, 
       </div>
       <div class="flex w-full items-center justify-end gap-3 sm:w-auto">
         <p class="w-20 text-right text-md font-semibold tabular" :class="on ? '' : 'text-caption'">{{ on ? watts(liveW) : '–' }}</p>
+        <RouterLink :to="`/devices/${d.id}`" :class="buttonVariants({ variant: 'ghost', size: 'sm' })">{{ t('detail.open') }}</RouterLink>
         <Button type="button" variant="outline" size="sm" :aria-expanded="open" @click="open = !open">
           {{ open ? t('common.close') : t('devices.manage') }}
         </Button>

@@ -5,6 +5,7 @@ import { useIntervalFn } from '@vueuse/core'
 import type { EChartsOption } from 'echarts'
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { RouterLink } from 'vue-router'
 import EChart from '@/components/charts/EChart.vue'
 import Sparkline from '@/components/charts/Sparkline.vue'
 import PageHeader from '@/components/PageHeader.vue'
@@ -188,7 +189,7 @@ const perHour = (w: number | null | undefined) => (w == null || price.value == n
       <article v-for="c in cards" :key="c.id" class="flex min-w-0 flex-col gap-2 rounded-lg border border-border bg-card px-4 py-3.5">
         <header class="flex items-start gap-2 text-sm">
           <span class="mt-1.5 size-2 shrink-0 rounded-full" :style="{ background: theme.slotColor(c.slot) }" aria-hidden="true" />
-          <span class="min-w-0 flex-1 font-medium [overflow-wrap:anywhere]">{{ c.name }}</span>
+          <RouterLink :to="`/devices/${c.id}`" class="min-w-0 flex-1 font-medium [overflow-wrap:anywhere] hover:underline">{{ c.name }}</RouterLink>
           <span class="shrink-0 rounded-full px-2 py-px text-xs"
                 :class="c.st === 'on' ? 'bg-selection font-medium text-foreground' : 'bg-muted text-muted-foreground'">{{ t(`live.status.${c.st}`) }}</span>
         </header>

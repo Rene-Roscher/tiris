@@ -16,7 +16,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from . import db
+from . import analysis, db
 from .api import costs as costs_api
 from .api import data as data_api
 from .api import devices as devices_api
@@ -153,7 +153,7 @@ def logout(response: Response):
     return {"ok": True}
 
 
-for r in (data_api.router, live_api.router, devices_api.router, costs_api.router):
+for r in (data_api.router, live_api.router, analysis.router, devices_api.router, costs_api.router):
     app.include_router(r)
 
 _static = Path(settings().static_dir) if settings().static_dir else None

@@ -69,6 +69,17 @@ def series(
                 WHERE bucket >= %s AND bucket < %s AND (%s::text[] IS NULL OR device_id = ANY(%s))
                 ORDER BY bucket""",
             (start, end, device, device)).fetchall()
+        if step >= 900:
+            # Fill buckets the live aggregates do not cover (before tiris ran, or while it was down) from the
+            # plug's own 5-minute buffer. Those rows have no voltage and n = 0, so the UI can tell them apart.
+            have = {(r[0], r[1]) for r in rows}
+            fill = con.execute(
+                """SELECT time_bucket(make_interval(secs => %s), ts) AS b, device_id, avg(w)::real, min(w)::real,
+                          max(w)::real, NULL::real, (avg(w) * %s / 3600.0)::real, 0
+                   FROM power_5min WHERE ts >= %s AND ts < %s AND (%s::text[] IS NULL OR device_id = ANY(%s))
+                   GROUP BY 1, 2""",
+                (step, step, start, end, device, device)).fetchall()
+            rows = sorted(rows + [r for r in fill if (r[0], r[1]) not in have], key=lambda r: r[0])
     if split:
         out: dict[str, list] = {}
         for b, did, w, wmin, wmax, v, wh, n in rows:
