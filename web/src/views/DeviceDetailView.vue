@@ -6,11 +6,9 @@ import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import EChart from '@/components/charts/EChart.vue'
-import KpiTile from '@/components/KpiTile.vue'
-import PageHeader from '@/components/PageHeader.vue'
-import Panel from '@/components/Panel.vue'
+import Section from '@/components/Section.vue'
+import Segmented from '@/components/Segmented.vue'
 import StateMessage from '@/components/StateMessage.vue'
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useChartTheme } from '@/composables/useChartTheme'
 import { api } from '@/lib/api'
 import { dayShort, duration, kwh, money, NBSP, num, pct, time, watts } from '@/lib/format'
@@ -35,6 +33,7 @@ const id = computed(() => String(route.params.id))
 const RANGES = [24, 168, 720] as const
 const hours = computed(() => { const h = Number(route.query.h); return RANGES.includes(h as never) ? h : 24 })
 const setHours = (h: number) => router.replace({ query: { ...route.query, h: String(h) } })
+const hourOptions = computed(() => [{ value: 24, label: t('detail.range.h24') }, { value: 168, label: t('detail.range.d7') }, { value: 720, label: t('detail.range.d30') }])
 
 const a = useQuery({
   queryKey: computed(() => ['analysis', id.value, hours.value]),
@@ -55,11 +54,11 @@ const price = computed(() => d.value?.price ?? null)
 const perDay = computed(() => (d.value?.cycles ? d.value.cycles.count / (hours.value / 24) : null))
 
 function timeLine(points: [number, number][], band: [number, number][] | null, unit: 'W' | 'V', min?: number, max?: number, from?: number): EChartsOption {
-  const th = theme.value, c = th.token('chart-1'), long = range.value.to - (from ?? range.value.from) > 48 * 3600
+  const th = theme.value, c = th.token('primary'), caption = th.token('caption'), long = range.value.to - (from ?? range.value.from) > 48 * 3600
   const fmt = (v: number) => (unit === 'W' ? watts(v) : `${num(v, 1)}${NBSP}V`)
   return {
     ...th.base,
-    grid: { left: 8, right: 16, top: 28, bottom: 4, containLabel: true },
+    grid: { left: 0, right: 0, top: 8, bottom: 0, containLabel: true },
     tooltip: { ...th.base.tooltip, trigger: 'axis', axisPointer: { type: 'line', lineStyle: { color: th.token('caption') } },
       formatter: (ps: unknown) => {
         const arr = ps as { value: [number, number]; seriesName: string }[]
@@ -67,17 +66,17 @@ function timeLine(points: [number, number][], band: [number, number][] | null, u
         const head = long ? `${dayShort(new Date(ts * 1000).toISOString())} ${time(ts)}` : time(ts)
         return [`<b>${head}</b>`, ...arr.map((p) => `${p.seriesName}: ${fmt(p.value[1])}`)].join('<br>')
       } },
-    xAxis: { type: 'time', min: (from ?? range.value.from) * 1000, max: range.value.to * 1000, splitLine: { show: false }, axisLine: th.base.axisCommon.axisLine,
-      axisLabel: { ...th.base.axisCommon.axisLabel, hideOverlap: true,
+    xAxis: { type: 'time', min: (from ?? range.value.from) * 1000, max: range.value.to * 1000, splitLine: { show: false }, axisLine: { show: false }, axisTick: { show: false },
+      axisLabel: { color: caption, fontSize: 11, hideOverlap: true,
         formatter: (v: number) => (long ? dayShort(new Date(v).toISOString()) : time(v / 1000)) } },
-    yAxis: { type: 'value', min: min ?? 0, max, scale: unit === 'V', splitLine: th.base.axisCommon.splitLine, name: unit, nameGap: 12,
-      nameTextStyle: { color: th.token('caption'), align: 'left' },
-      axisLabel: { ...th.base.axisCommon.axisLabel, formatter: (v: number) => num(v) } },
+    yAxis: { type: 'value', min: min ?? 0, max, scale: unit === 'V', position: 'right', splitNumber: 3, splitLine: th.base.axisCommon.splitLine,
+      axisLabel: { color: caption, fontSize: 11, showMinLabel: unit === 'W', formatter: (v: number) => `${num(v)}${NBSP}${unit}` } },
     series: [
       ...(band ? [{ type: 'line' as const, name: t('detail.peak'), data: band.map(([x, y]) => [x * 1000, y]), showSymbol: false,
         lineStyle: { width: 0 }, areaStyle: { color: c, opacity: 0.14 }, z: 1 }] : []),
       { type: 'line', name: unit === 'W' ? t('detail.avgPower') : t('detail.voltageChart'), data: points.map(([x, y]) => [x * 1000, y]),
-        showSymbol: false, lineStyle: { width: 2, color: c }, areaStyle: unit === 'W' ? { color: c, opacity: 0.08 } : undefined, z: 2 },
+        showSymbol: false, lineStyle: { width: 1.5, color: c }, z: 2,
+        areaStyle: unit === 'W' ? { color: { type: 'linear', x: 0, y: 0, x2: 0, y2: 1, colorStops: [{ offset: 0, color: `${c}30` }, { offset: 1, color: `${c}00` }] } } : undefined },
     ],
   }
 }
@@ -101,9 +100,21 @@ const yCap = computed(() => {
   const max = Math.ceil((p99 * 1.15) / 10) * 10
   return { max, clipped: peaks.filter((v) => v > max).length, top: peaks.at(-1)! }
 })
+// When the stored data starts late in the range (tiris is new), the chart starts there instead of drawing an empty axis.
+const dataFrom = computed(() => {
+  const first = pts.value[0]?.[0]
+  if (first == null) return null
+  const span = range.value.to - range.value.from
+  return first - range.value.from > span * 0.2 ? first - (s.data.value?.step_s ?? 60) : null
+})
+const powerNote = computed(() => [
+  dataFrom.value ? t('detail.since', { time: `${dayShort(new Date(dataFrom.value * 1000).toISOString())} ${time(dataFrom.value)}` }) : '',
+  yCap.value.clipped ? t('detail.clipped', { max: watts(yCap.value.max), top: watts(yCap.value.top) }) : '',
+  d.value?.range.resolution !== 'raw' && d.value?.cycles?.count ? t('detail.cyclesNote') : '',
+].filter(Boolean).join(' '))
 const powerOption = computed(() => {
   const step = s.data.value?.step_s ?? 60
-  return timeLine(withGaps(pts.value, (p) => p[1], step), withGaps(pts.value, (p) => p[3], step), 'W', 0, yCap.value.max)
+  return timeLine(withGaps(pts.value, (p) => p[1], step), withGaps(pts.value, (p) => p[3], step), 'W', 0, yCap.value.max, dataFrom.value ?? undefined)
 })
 const voltOption = computed(() => {
   const step = s.data.value?.step_s ?? 60
@@ -116,72 +127,85 @@ const dailyOption = computed<EChartsOption>(() => {
   const th = theme.value, rows = d.value?.daily ?? []
   return {
     ...th.base,
-    grid: { ...th.base.grid, top: 28 },
+    grid: { left: 0, right: 0, top: 8, bottom: 0, containLabel: true },
     tooltip: { ...th.base.tooltip, trigger: 'axis', axisPointer: { type: 'shadow', shadowStyle: { color: th.token('muted') } },
       formatter: (ps: unknown) => {
         const p = (ps as { dataIndex: number }[])[0]!, r = rows[p.dataIndex]!
         return `<b>${dayShort(r.day)}</b><br>${kwh(r.wh)}${NBSP}kWh${price.value != null ? `<br>${money(r.wh / 1000 * price.value)}` : ''}`
       } },
-    xAxis: { type: 'category', data: rows.map((r) => r.day), axisTick: { show: false }, axisLine: th.base.axisCommon.axisLine,
-      axisLabel: { ...th.base.axisCommon.axisLabel, formatter: (v: string) => dayShort(v), hideOverlap: true } },
-    yAxis: { type: 'value', splitLine: th.base.axisCommon.splitLine, name: 'kWh', nameGap: 12, nameTextStyle: { color: th.token('caption'), align: 'left' },
-      axisLabel: { ...th.base.axisCommon.axisLabel, formatter: (v: number) => num(v, v < 1 ? 1 : 0) } },
-    series: [{ type: 'bar', barMaxWidth: 18, itemStyle: { color: th.token('chart-1'), borderRadius: [3, 3, 0, 0] },
-      data: rows.map((r) => +(r.wh / 1000).toFixed(3)) }],
+    xAxis: { type: 'category', data: rows.map((r) => r.day), axisTick: { show: false }, axisLine: { show: false },
+      axisLabel: { color: th.token('caption'), fontSize: 11, formatter: (v: string) => dayShort(v), hideOverlap: true } },
+    yAxis: { type: 'value', position: 'right', splitNumber: 3, splitLine: th.base.axisCommon.splitLine,
+      axisLabel: { color: th.token('caption'), fontSize: 11, formatter: (v: number) => `${num(v, v < 1 ? 1 : 0)}${NBSP}kWh` } },
+    series: [{ type: 'bar', barMaxWidth: 18, emphasis: { itemStyle: { color: th.token('bar-hover') } },
+      data: rows.map((r, i) => ({ value: +(r.wh / 1000).toFixed(3), itemStyle: { color: th.token(i === rows.length - 1 ? 'primary' : 'bar'), borderRadius: [2, 2, 0, 0] } })) }],
   }
 })
 </script>
 
 <template>
-  <RouterLink to="/devices" class="mb-3 inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground">
+  <RouterLink to="/devices" class="mb-2 inline-flex items-center gap-1.5 text-sm text-caption hover:text-foreground">
     <ArrowLeft class="size-4" aria-hidden="true" />{{ t('detail.back') }}
   </RouterLink>
-  <PageHeader :title="d?.device.name ?? '…'" :description="d ? [d.device.model, d.device.room, d.device.category].filter(Boolean).join(', ') : undefined">
-    <Tabs :model-value="String(hours)" @update:model-value="(v) => setHours(Number(v))">
-      <TabsList>
-        <TabsTrigger value="24">{{ t('detail.range.h24') }}</TabsTrigger>
-        <TabsTrigger value="168">{{ t('detail.range.d7') }}</TabsTrigger>
-        <TabsTrigger value="720">{{ t('detail.range.d30') }}</TabsTrigger>
-      </TabsList>
-    </Tabs>
-  </PageHeader>
+  <div class="mb-7 flex flex-wrap items-end justify-between gap-3">
+    <div class="min-w-0">
+      <h1 class="text-lg font-semibold">{{ d?.device.name ?? '…' }}</h1>
+      <p v-if="d" class="mt-0.5 text-sm text-caption">{{ [d.device.model, d.device.room, d.device.category].filter(Boolean).join(' · ') }}</p>
+    </div>
+    <Segmented :model-value="hours" :options="hourOptions" :label="t('detail.rangeLabel')" @update:model-value="(v) => setHours(Number(v))" />
+  </div>
 
   <StateMessage v-if="a.isError.value && !d" kind="error" :title="t('states.errorTitle')" :body="t('states.errorBody', { detail: a.error.value?.message ?? '' })"
                 :action="t('common.retry')" @action="a.refetch()" />
-  <div v-else class="flex flex-col gap-4 transition-opacity" :class="a.isFetching.value && d ? 'opacity-60' : ''">
-    <section class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-      <KpiTile :label="t('detail.energy')" :value="kwh(d?.energy_wh)" unit="kWh" :loading="!d"
-               :sub="price != null && d ? money(d.energy_wh / 1000 * price) : undefined" />
-      <KpiTile :label="t('detail.avgPower')" :value="d?.power.avg == null ? '–' : num(d.power.avg, d.power.avg < 10 ? 1 : 0)" unit="W" :loading="!d"
-               :sub="d?.power.max != null ? `${t('detail.peak')} ${watts(d.power.max)}` : undefined" />
-      <KpiTile :label="t('detail.base')" :value="d ? num(d.power.base, d.power.base < 10 ? 1 : 0) : '–'" unit="W" :loading="!d" :sub="t('detail.baseSub')" />
-      <KpiTile :label="t('detail.voltage')" :value="d?.voltage.avg == null ? '–' : num(d.voltage.avg, 1)" unit="V" :loading="!d"
-               :sub="d?.voltage.min != null ? t('detail.voltageSub', { min: `${num(d.voltage.min, 1)}${NBSP}V`, max: `${num(d.voltage.max, 1)}${NBSP}V` }) : undefined" />
-      <template v-if="d?.cycles && d.cycles.count">
-        <KpiTile :label="t('detail.cycles')" :value="num(d.cycles.count)" :sub="t('detail.cyclesSub', { n: num(perDay, 1), w: watts(d.cycles.threshold_w) })" />
-        <KpiTile :label="t('detail.duty')" :value="pct(d.cycles.duty)" :sub="t('detail.dutySub')" />
-        <KpiTile :label="t('detail.runTime')" :value="duration(d.cycles.median_s)" :sub="t('detail.runTimeSub', { max: duration(d.cycles.max_s) })" />
-      </template>
+  <div v-else class="flex flex-col divide-y divide-border transition-opacity" :class="a.isFetching.value && d ? 'opacity-60' : ''">
+    <section class="pb-8">
+      <div>
+        <p class="text-xs font-medium text-caption">{{ t('detail.energy') }}</p>
+        <div v-if="!d" class="mt-2 h-12 w-40 animate-pulse rounded-md bg-muted" />
+        <p v-else class="mt-2 text-4xl font-semibold tabular">{{ kwh(d.energy_wh) }}<span class="ml-1 text-lg font-medium tracking-normal text-caption">kWh</span></p>
+        <p v-if="d && price != null" class="mt-1 text-sm text-muted-foreground tabular">{{ money(d.energy_wh / 1000 * price) }}</p>
+      </div>
+      <dl v-if="d" class="mt-7 grid grid-cols-2 gap-x-8 gap-y-5 text-sm sm:grid-cols-3 xl:grid-cols-6 xl:gap-0 xl:divide-x xl:divide-border">
+        <div class="xl:px-5 xl:first:pl-0"><dt class="text-xs text-caption">{{ t('detail.avgPower') }}</dt>
+          <dd class="mt-1 font-semibold tabular">{{ d.power.avg == null ? '–' : watts(d.power.avg) }}</dd>
+          <dd v-if="d.power.max != null" class="text-xs text-caption">{{ t('detail.peak') }} {{ watts(d.power.max) }}</dd></div>
+        <div class="xl:px-5 xl:first:pl-0"><dt class="text-xs text-caption">{{ t('detail.base') }}</dt>
+          <dd class="mt-1 font-semibold tabular">{{ watts(d.power.base) }}</dd>
+          <dd class="text-xs text-caption">{{ d.power.base < 0.5 ? t('detail.baseZero') : t('detail.baseSub') }}</dd></div>
+        <div class="xl:px-5 xl:first:pl-0"><dt class="text-xs text-caption">{{ t('detail.voltage') }}</dt>
+          <dd class="mt-1 font-semibold tabular">{{ d.voltage.avg == null ? '–' : `${num(d.voltage.avg, 1)}${NBSP}V` }}</dd>
+          <dd v-if="d.voltage.min != null" class="text-xs text-caption tabular">{{ num(d.voltage.min, 1) }}–{{ num(d.voltage.max, 1) }}{{ NBSP }}V</dd></div>
+        <template v-if="d.cycles && d.cycles.count">
+          <div class="xl:px-5 xl:first:pl-0"><dt class="text-xs text-caption">{{ t('detail.cycles') }}</dt>
+            <dd class="mt-1 font-semibold tabular">{{ num(d.cycles.count) }}</dd>
+            <dd class="text-xs text-caption">{{ t('detail.cyclesSub', { n: num(perDay, 1), w: watts(d.cycles.threshold_w) }) }}</dd></div>
+          <div class="xl:px-5 xl:first:pl-0"><dt class="text-xs text-caption">{{ t('detail.duty') }}</dt>
+            <dd class="mt-1 font-semibold tabular">{{ pct(d.cycles.duty) }}</dd>
+            <dd class="text-xs text-caption">{{ t('detail.dutySub') }}</dd></div>
+          <div class="xl:pl-5"><dt class="text-xs text-caption">{{ t('detail.runTime') }}</dt>
+            <dd class="mt-1 font-semibold tabular">{{ duration(d.cycles.median_s) }}</dd>
+            <dd class="text-xs text-caption">{{ t('detail.runTimeSub', { max: duration(d.cycles.max_s) }) }}</dd></div>
+        </template>
+      </dl>
     </section>
-    <p v-if="d?.range.resolution !== 'raw' && d?.cycles?.count" class="-mt-2 text-sm text-caption">{{ t('detail.cyclesNote') }}</p>
 
-    <Panel :title="t('detail.power')" :description="s.data.value ? t('detail.powerSub', { res: t(`detail.resolution.${s.data.value.bucket}`) }) : undefined">
-      <div v-if="!s.data.value" class="h-[280px] animate-pulse rounded-md bg-muted" />
+    <Section :title="t('detail.power')" :summary="s.data.value ? t('detail.powerSub', { res: t(`detail.resolution.${s.data.value.bucket}`) }) : undefined">
+      <div v-if="!s.data.value" class="h-[260px] animate-pulse rounded-md bg-muted" />
       <p v-else-if="!pts.length" class="py-10 text-center text-sm text-muted-foreground">{{ t('detail.noData') }}</p>
-      <EChart v-else :option="powerOption" :height="280" :label="t('detail.power')" />
-      <p v-if="yCap.clipped" class="mt-2 text-sm text-caption">{{ t('detail.clipped', { max: watts(yCap.max), top: watts(yCap.top) }) }}</p>
-    </Panel>
+      <EChart v-else :option="powerOption" :height="260" :label="t('detail.power')" />
+      <p v-if="powerNote" class="mt-3 text-sm text-caption">{{ powerNote }}</p>
+    </Section>
 
-    <section class="grid gap-4 lg:grid-cols-2">
-      <Panel :title="t('detail.voltageChart')" :description="t('detail.voltageSub2')">
-        <div v-if="!s.data.value" class="h-[220px] animate-pulse rounded-md bg-muted" />
+    <div class="grid gap-x-12 lg:grid-cols-2">
+      <Section :title="t('detail.voltageChart')" :summary="t('detail.voltageSub2')">
+        <div v-if="!s.data.value" class="h-[200px] animate-pulse rounded-md bg-muted" />
         <p v-else-if="!pts.length" class="py-10 text-center text-sm text-muted-foreground">{{ t('detail.noData') }}</p>
-        <EChart v-else :option="voltOption" :height="220" :label="t('detail.voltageChart')" />
-      </Panel>
-      <Panel :title="t('detail.daily')" :description="t('detail.dailySub')">
-        <div v-if="!d" class="h-[220px] animate-pulse rounded-md bg-muted" />
-        <EChart v-else :option="dailyOption" :height="220" :label="t('detail.daily')" />
-      </Panel>
-    </section>
+        <EChart v-else :option="voltOption" :height="200" :label="t('detail.voltageChart')" />
+      </Section>
+      <Section :title="t('detail.daily')" :summary="t('detail.dailySub')" class="border-t border-border lg:border-t-0">
+        <div v-if="!d" class="h-[200px] animate-pulse rounded-md bg-muted" />
+        <EChart v-else :option="dailyOption" :height="200" :label="t('detail.daily')" />
+      </Section>
+    </div>
   </div>
 </template>

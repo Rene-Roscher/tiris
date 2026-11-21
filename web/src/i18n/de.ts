@@ -135,7 +135,7 @@ export default {
     health: { overcurrent: 'Überstrom', overheat: 'Überhitzung', power_protection: 'Überlastschutz' },
     archivedCount: '{n} archiviert',
   },
-  detail: {
+  detail: { rangeLabel: 'Zeitraum', baseZero: 'schaltet zwischendurch ganz ab', since: 'Gespeicherte Daten ab {time}.',
     back: 'Alle Geräte',
     open: 'Details',
     range: { h24: '24 Stunden', d7: '7 Tage', d30: '30 Tage' },
@@ -155,7 +155,7 @@ export default {
     power: 'Leistung',
     powerSub: 'Ø je {res}; die Fläche zeigt Minimum bis Maximum',
     voltageChart: 'Spannung',
-    voltageSub2: 'Nur aus Live-Messungen; der Speicher des Plugs enthält keine Spannung.',
+    voltageSub2: 'nur aus Live-Messungen',
     clipped: 'Spitzen über {max} sind abgeschnitten (höchste {top}); der Tooltip zeigt sie.',
     daily: 'Energie pro Tag',
     dailySub: 'Tageswerte vom Plug, letzte 60 Tage',

@@ -135,7 +135,7 @@ export default {
     health: { overcurrent: 'Overcurrent', overheat: 'Overheating', power_protection: 'Overload protection' },
     archivedCount: '{n} archived',
   },
-  detail: {
+  detail: { rangeLabel: 'Range', baseZero: 'switches fully off in between', since: 'Stored data from {time}.',
     back: 'All devices',
     open: 'Details',
     range: { h24: '24 hours', d7: '7 days', d30: '30 days' },
@@ -155,7 +155,7 @@ export default {
     power: 'Power',
     powerSub: 'Average per {res}; the band shows minimum to maximum',
     voltageChart: 'Voltage',
-    voltageSub2: 'Live measurements only; the plug does not store voltage.',
+    voltageSub2: 'live measurements only',
     clipped: 'Peaks above {max} are cut off (highest {top}); the tooltip shows them.',
     daily: 'Energy per day',
     dailySub: 'Daily values from the plug, last 60 days',
