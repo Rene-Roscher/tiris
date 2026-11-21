@@ -4,10 +4,9 @@ import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import DeviceCard from '@/components/devices/DeviceCard.vue'
-import PageHeader from '@/components/PageHeader.vue'
+import Segmented from '@/components/Segmented.vue'
 import StateMessage from '@/components/StateMessage.vue'
 import { Button } from '@/components/ui/button'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useAction } from '@/composables/useAction'
 import { useLive } from '@/composables/useLive'
 import { ApiError, api } from '@/lib/api'
@@ -48,50 +47,44 @@ const stats = computed(() => {
 })
 const { busy, run } = useAction([['devices']], () => t('devices.title'))
 const restore = (d: Device) => run(() => api.patch(`/api/devices/${d.id}`, { retired: false }))
+const roomOptions = computed(() => [{ value: 'all', label: t('common.all') }, ...rooms.value.map((r) => ({ value: r, label: r })), { value: '-', label: t('devices.noRoom') }])
 const setRoom = (v: string) => router.replace({ query: { ...route.query, room: v === 'all' ? undefined : v } })
 const noTapo = computed(() => q.error.value instanceof ApiError && q.error.value.status === 503)
 </script>
 
 <template>
-  <PageHeader :title="t('devices.title')">
-    <Select v-if="rooms.length" :model-value="room" @update:model-value="(v) => setRoom(String(v))">
-      <SelectTrigger class="h-9 w-48" :aria-label="t('devices.room')"><SelectValue /></SelectTrigger>
-      <SelectContent>
-        <SelectItem value="all">{{ t('common.all') }}</SelectItem>
-        <SelectItem v-for="r in rooms" :key="r" :value="r">{{ r }}</SelectItem>
-        <SelectItem value="-">{{ t('devices.noRoom') }}</SelectItem>
-      </SelectContent>
-    </Select>
-  </PageHeader>
+  <div class="mb-7 flex min-h-9 flex-wrap items-center justify-between gap-3">
+    <div class="flex flex-wrap items-baseline gap-x-4 gap-y-1">
+      <h1 class="font-semibold">{{ t('devices.title') }}</h1>
+      <p v-if="all.length" class="text-sm text-caption tabular">
+        <template v-for="(s, i) in stats" :key="s.label"><template v-if="!s.warn || s.n">{{ i ? ' · ' : '' }}<span :class="s.warn && s.n ? 'font-medium text-warn' : ''">{{ s.n }} {{ s.label }}</span></template></template>
+      </p>
+    </div>
+    <Segmented v-if="rooms.length" :model-value="room" :options="roomOptions" :label="t('devices.room')" @update:model-value="(v) => setRoom(String(v))" />
+  </div>
 
   <StateMessage v-if="noTapo" kind="setup" :title="t('states.noTapoTitle')" :body="t('states.noTapoBody')" />
   <StateMessage v-else-if="q.isError.value" kind="error" :title="t('states.errorTitle')"
                 :body="t('states.errorBody', { detail: q.error.value?.message ?? '' })" :action="t('common.retry')" @action="q.refetch()" />
   <div v-else-if="q.isLoading.value" class="flex flex-col gap-2">
-    <div v-for="i in 5" :key="i" class="h-16 animate-pulse rounded-lg bg-muted" />
+    <div v-for="i in 5" :key="i" class="h-14 animate-pulse rounded-md bg-muted" />
   </div>
   <StateMessage v-else-if="!all.length" :title="t('states.noDataTitle')" :body="t('states.noDataBody')" />
 
-  <div v-else class="flex flex-col gap-6">
-    <ul class="flex flex-wrap gap-x-8 gap-y-2 rounded-lg border border-border bg-card px-5 py-3.5">
-      <li v-for="s in stats" :key="s.label" class="flex items-baseline gap-1.5">
-        <span class="text-lg font-semibold tabular" :class="s.warn && s.n ? 'text-warn' : ''">{{ s.n }}</span>
-        <span class="text-sm text-muted-foreground">{{ s.label }}</span>
-      </li>
-    </ul>
-
-    <section v-for="[r, devs] in groups" :key="r" class="flex flex-col gap-2">
-      <div class="flex items-baseline gap-2">
-        <h2 class="text-sm font-medium text-muted-foreground">{{ r || t('devices.noRoom') }}</h2>
-        <span class="text-sm text-caption tabular">{{ devs.length }}</span>
-      </div>
-      <DeviceCard v-for="d in devs" :key="d.id" :device="d" :live-w="live.snapshot.value?.devices[d.id]?.w" :rooms="rooms" :categories="categories" />
+  <div v-else class="flex flex-col gap-8">
+    <section v-for="[r, devs] in groups" :key="r">
+      <h2 class="mb-1 flex items-baseline gap-2 text-xs font-medium text-caption">
+        {{ r || t('devices.noRoom') }}<span class="tabular">{{ devs.length }}</span>
+      </h2>
+      <ul class="divide-y divide-border border-y border-border">
+        <DeviceCard v-for="d in devs" :key="d.id" :device="d" :live-w="live.snapshot.value?.devices[d.id]?.w" :rooms="rooms" :categories="categories" />
+      </ul>
     </section>
 
-    <details v-if="retired.length" class="rounded-lg border border-border bg-card px-5 py-3">
-      <summary class="cursor-pointer text-sm text-muted-foreground">{{ t('devices.archivedCount', { n: retired.length }) }}</summary>
-      <ul class="mt-2 divide-y divide-border">
-        <li v-for="d in retired" :key="d.id" class="flex items-center justify-between gap-3 py-2 text-sm">
+    <details v-if="retired.length" class="text-sm">
+      <summary class="cursor-pointer text-caption hover:text-foreground">{{ t('devices.archivedCount', { n: retired.length }) }}</summary>
+      <ul class="mt-2 divide-y divide-border border-y border-border">
+        <li v-for="d in retired" :key="d.id" class="flex items-center justify-between gap-3 py-2.5">
           <span>{{ d.name }} <span class="text-caption">{{ d.model }}, {{ d.ip }}</span></span>
           <Button type="button" variant="outline" size="sm" :disabled="busy" @click="restore(d)">{{ t('devices.maintenance.restore') }}</Button>
         </li>

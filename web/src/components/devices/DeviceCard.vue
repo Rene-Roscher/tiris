@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import { Lock, Pencil, TimerIcon, TriangleAlert } from '@lucide/vue'
+import { ChevronRight, Lock, Pencil, SlidersHorizontal, TimerIcon, TriangleAlert } from '@lucide/vue'
 import { useQueryClient } from '@tanstack/vue-query'
 import { computed, nextTick, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { RouterLink } from 'vue-router'
-import { Button, buttonVariants } from '@/components/ui/button'
+import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { confirm } from '@/composables/useConfirm'
@@ -80,27 +80,29 @@ const mmss = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, 
 </script>
 
 <template>
-  <article class="rounded-lg border bg-card" :class="reachable ? 'border-border' : 'border-dashed border-border-strong'">
-    <div class="flex flex-wrap items-center gap-4 px-4 py-3">
+  <li class="group/row">
+    <div class="flex flex-wrap items-center gap-x-4 gap-y-2 py-3">
       <Switch :model-value="on" :disabled="busy || !reachable || (d.protected && on)"
               :aria-label="d.name" @update:model-value="(v: boolean) => setPower(v)" />
       <div class="min-w-[12rem] flex-1">
         <div class="flex flex-wrap items-center gap-2">
           <input v-if="editing" ref="nameInput" v-model="name" maxlength="64" :aria-label="t('devices.rename')"
-                 class="h-7 min-w-56 rounded-md border border-ring bg-card px-2 font-medium"
+                 class="h-7 min-w-56 rounded-md border border-ring bg-background px-2 font-medium"
                  @keydown.enter.prevent="saveName" @keydown.esc="editing = false" @blur="saveName" />
-          <button v-else type="button" class="group flex items-center gap-1.5 rounded-sm font-medium" :class="on || !reachable ? '' : 'text-muted-foreground'"
-                  :title="t('devices.renameHint')" @click="startEdit">
-            {{ d.name }}
-            <Pencil class="size-3.5 text-caption opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100" aria-hidden="true" />
-          </button>
-          <span v-if="d.protected" class="flex items-center gap-1 rounded-full bg-selection px-2 py-px text-xs font-medium">
+          <template v-else>
+            <RouterLink :to="`/devices/${d.id}`" class="font-medium hover:underline" :class="on || !reachable ? '' : 'text-muted-foreground'">{{ d.name }}</RouterLink>
+            <button type="button" class="grid size-6 place-items-center rounded-md text-caption opacity-0 transition-[opacity,color,background-color] hover:bg-muted hover:text-foreground focus-visible:opacity-100 group-hover/row:opacity-100"
+                    :aria-label="t('devices.renameHint')" :title="t('devices.renameHint')" @click="startEdit">
+              <Pencil class="size-3.5" aria-hidden="true" />
+            </button>
+          </template>
+          <span v-if="d.protected" class="flex items-center gap-1 text-xs text-muted-foreground" :title="t('devices.protected')">
             <Lock class="size-3" aria-hidden="true" />{{ t('devices.protected') }}
           </span>
-          <span v-if="d.category" class="rounded-full bg-muted px-2 py-px text-xs text-muted-foreground">{{ d.category }}</span>
         </div>
         <div class="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-sm text-caption">
           <span>{{ d.model }}</span>
+          <span v-if="d.category">{{ d.category }}</span>
           <span v-if="reachable" class="flex items-end gap-px" :title="`${d.status.rssi} dBm`">
             <span v-for="n in 4" :key="n" class="w-[3px] rounded-[1px]" :class="n <= signal ? 'bg-muted-foreground' : 'bg-border-strong'"
                   :style="{ height: `${3 + n * 2.5}px` }" aria-hidden="true" />
@@ -115,22 +117,27 @@ const mmss = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, 
           <span v-for="k in issues" :key="k" class="flex items-center gap-1 text-bad">
             <TriangleAlert class="size-3.5" aria-hidden="true" />{{ t(`devices.health.${k}`) }}
           </span>
-          <button v-if="d.firmware?.available" type="button" class="rounded-full bg-warn-fill px-2 py-px text-xs font-medium text-black"
+          <button v-if="d.firmware?.available" type="button" class="flex items-center gap-1.5 rounded-sm font-medium text-warn hover:underline"
                   @click="open = true; tab = 'maintenance'">
+            <span class="size-1.5 rounded-full bg-warn-fill" aria-hidden="true" />
             {{ t('devices.maintenance.fwAvailable', { version: d.firmware.version?.split(' ')[0] }) }}
           </button>
         </div>
       </div>
-      <div class="flex w-full items-center justify-end gap-3 sm:w-auto">
-        <p class="w-20 text-right text-md font-semibold tabular" :class="on ? '' : 'text-caption'">{{ on ? watts(liveW) : '–' }}</p>
-        <RouterLink :to="`/devices/${d.id}`" :class="buttonVariants({ variant: 'ghost', size: 'sm' })">{{ t('detail.open') }}</RouterLink>
-        <Button type="button" variant="outline" size="sm" :aria-expanded="open" @click="open = !open">
-          {{ open ? t('common.close') : t('devices.manage') }}
+      <div class="flex w-full items-center justify-end gap-1 sm:w-auto">
+        <p class="mr-3 w-20 text-right tabular" :class="on ? 'text-md font-semibold' : 'text-sm text-caption'">{{ on ? watts(liveW) : t('app.off') }}</p>
+        <Button type="button" variant="ghost" size="icon-sm" :aria-expanded="open" :aria-label="t('devices.manage')" :title="t('devices.manage')"
+                :class="open ? 'bg-muted text-foreground' : 'text-caption'" @click="open = !open">
+          <SlidersHorizontal class="size-4" aria-hidden="true" />
         </Button>
+        <RouterLink :to="`/devices/${d.id}`" class="grid size-8 place-items-center rounded-md text-caption transition-[color,background-color] hover:bg-muted hover:text-foreground"
+                    :aria-label="t('detail.open')" :title="t('detail.open')">
+          <ChevronRight class="size-4" aria-hidden="true" />
+        </RouterLink>
       </div>
     </div>
 
-    <div v-if="open" class="border-t border-border px-4 py-4">
+    <div v-if="open" class="mb-3 rounded-lg bg-muted/60 px-4 py-4">
       <Tabs v-model="tab">
         <TabsList>
           <TabsTrigger value="settings">{{ t('devices.tabs.settings') }}</TabsTrigger>
@@ -144,5 +151,5 @@ const mmss = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, 
         <TabsContent value="maintenance" class="pt-4"><DeviceMaintenance :device="d" /></TabsContent>
       </Tabs>
     </div>
-  </article>
+  </li>
 </template>
