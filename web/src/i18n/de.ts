@@ -1,6 +1,6 @@
 export default {
   nav: { overview: 'Übersicht', live: 'Live', devices: 'Geräte', costs: 'Kosten', settings: 'Einstellungen' },
-  app: {
+  app: { notifications: 'Benachrichtigungen',
     tagline: 'Energie im Blick',
     lastRun: 'Letzter Abruf {when}',
     runFailed: 'Letzter Abruf mit Fehlern',

@@ -56,6 +56,15 @@ const loggedIn = () => window.location.reload()
       </SheetContent>
     </Sheet>
     <ConfirmHost />
-    <Toaster position="bottom-center" :toast-options="{ unstyled: true }" class="z-toast" />
+    <Toaster
+      class="lp-toaster z-toast"
+      position="bottom-center"
+      :offset="{ bottom: 32 }"
+      :mobile-offset="{ bottom: 16 }"
+      :expand="false"
+      :visible-toasts="3"
+      :gap="8"
+      :container-aria-label="t('app.notifications')"
+    />
   </TooltipProvider>
 </template>

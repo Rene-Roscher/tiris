@@ -4,7 +4,9 @@ import App from './App.vue'
 import { i18n } from './i18n'
 import { installSprings } from './lib/motion'
 import { router } from './router'
+import 'vue-sonner/style.css'
 import './styles/app.css'
+import './styles/toast.css'
 
 installSprings()
 

@@ -1,0 +1,220 @@
+/*
+  Toast pill: from the ui-motion toast example (Rene-Roscher/skills), adapted to tiris tokens.
+  Springs: --lp-enter (300/24), --lp-morph (340/28), --lp-stack (400/38), generated at startup (lib/motion.ts);
+  the values below are fallbacks for the first paint.
+  Changes against the demo (interface-motion):
+  - waiting pills spring back on the dragged pill's curve (--lp-enter) for size and text, so a catch mid-flight
+    finds them where the shared --lp-peek says (the demo used --lp-morph and jumped 1 to 4 px).
+*/
+:root {
+    --lp-enter: cubic-bezier(0.2, 0, 0, 1); --lp-enter-ms: 542ms;
+    --lp-morph: cubic-bezier(0.2, 0, 0, 1); --lp-morph-ms: 421ms;
+    --lp-stack: cubic-bezier(0.2, 0, 0, 1); --lp-stack-ms: 354ms;
+}
+/* Farben der Pille: gelten für Toasts und Speicherleiste */
+.lp-toaster {
+    --lp-bg: var(--popover);
+    --lp-fg: var(--popover-foreground);
+    --lp-sub: var(--muted-foreground);
+    --lp-ring: color-mix(in oklab, var(--foreground) 9%, transparent);
+    --lp-shadow: 0 0 0 1px var(--lp-ring), 0 12px 28px -12px rgb(0 0 0 / 0.28), 0 3px 8px -4px rgb(0 0 0 / 0.1);
+    --lp-success: var(--good);
+    --lp-error: var(--bad);
+    --lp-warning: var(--warn);
+    --lp-info: var(--link);
+    transition: bottom var(--lp-morph-ms) var(--lp-morph), top var(--lp-morph-ms) var(--lp-morph);
+}
+.dark .lp-toaster {
+    --lp-ring: color-mix(in oklab, white 10%, transparent);
+    --lp-shadow: 0 0 0 1px var(--lp-ring), 0 16px 36px -14px rgb(0 0 0 / 0.85), 0 2px 6px -2px rgb(0 0 0 / 0.5);
+}
+
+/* Sonner-Zeile: volle Breite, Pille mittig, Bewegungen mit Feder statt ease */
+.lp-toaster [data-sonner-toast][data-styled='false'] {
+    left: 0;
+    right: 0;
+    display: flex;
+    justify-content: center;
+    pointer-events: none;
+    transition: transform var(--lp-enter-ms) var(--lp-enter), opacity 0.3s ease-out, height var(--lp-stack-ms) var(--lp-stack);
+}
+.lp-toaster [data-sonner-toast][data-styled='false'][data-swiping='true'] { transition: none; }
+
+.lp {
+    --c: var(--lp-fg);
+    position: relative;
+    flex: none;
+    box-sizing: border-box;
+    overflow: hidden;
+    border-radius: 22px;
+    background: var(--lp-bg);
+    color: var(--lp-fg);
+    box-shadow: var(--lp-shadow);
+    font-family: var(--font-sans);
+    font-size: 14px;
+    line-height: 1.35;
+    -webkit-font-smoothing: antialiased;
+    pointer-events: auto;
+    cursor: grab;
+    touch-action: none;
+    user-select: none;
+    -webkit-user-select: none;
+    transition: width var(--lp-morph-ms) var(--lp-morph), height var(--lp-morph-ms) var(--lp-morph), box-shadow 0.2s ease, opacity 0.2s ease, transform 0.2s ease, translate var(--lp-enter-ms) var(--lp-enter);
+    animation: lp-pop var(--lp-enter-ms) var(--lp-enter), lp-fade 0.18s ease-out;
+}
+[data-y-position='bottom'] > .lp { transform-origin: 50% 100%; }
+[data-y-position='top'] > .lp { transform-origin: 50% 0%; }
+.lp[data-type='success'] { --c: var(--lp-success); }
+.lp[data-type='error'] { --c: var(--lp-error); }
+.lp[data-type='warning'] { --c: var(--lp-warning); }
+.lp[data-type='info'] { --c: var(--lp-info); }
+@keyframes lp-pop { from { transform: scale(0.5); } }
+@keyframes lp-fade { from { opacity: 0; } }
+
+.lp-inner {
+    display: flex;
+    align-items: center;
+    width: max-content;
+    min-height: 44px;
+    max-width: min(480px, calc(100vw - 32px));
+    transition: opacity 0.25s ease-out, transform var(--lp-morph-ms) var(--lp-morph);
+}
+/* geschlossen: das Icon sitzt mittig in der runden Form */
+.lp:not(.is-open) .lp-inner { transform: translateX(calc((var(--lp-w0) - 44px) / 2)); }
+
+.lp-icon { position: relative; flex: none; display: grid; place-items: center; width: 44px; height: 44px; }
+.lp-copy { position: relative; display: block; flex: none; padding: 12px 18px 12px 0; max-width: min(320px, calc(100vw - 200px)); }
+.lp-inner:has(> .lp-actions:not(.lp-act-leave-active)) .lp-copy { padding-right: 10px; }
+.lp-text { display: block; }
+.lp-title { display: block; font-weight: 600; }
+.lp-count { display: inline-block; margin-left: 6px; font-size: 13px; font-weight: 500; color: var(--lp-sub); font-variant-numeric: tabular-nums; animation: lp-count-pop var(--lp-enter-ms) var(--lp-enter); }
+@keyframes lp-count-pop { from { opacity: 0; transform: scale(0.5); } }
+.lp-meta { display: inline-block; min-width: 4ch; margin-left: 6px; text-align: right; font-size: 13px; font-weight: 500; color: var(--lp-sub); font-variant-numeric: tabular-nums; }
+.lp-desc { display: block; margin-top: 1px; font-size: 13px; font-weight: 400; color: var(--lp-sub); }
+
+.lp-copy, .lp-actions { transition: opacity 0.32s ease-out 0.06s, filter 0.4s ease-out 0.06s, transform var(--lp-morph-ms) var(--lp-morph) 0.02s; }
+.lp:not(.is-open) .lp-copy, .lp:not(.is-open) .lp-actions { opacity: 0; filter: blur(8px); transform: translateX(-10px); }
+
+/* Textwechsel: alt verschwimmt nach oben, neu kommt scharf von unten */
+.lp-text-enter-active { transition: opacity 0.3s ease-out 0.05s, filter 0.36s ease-out 0.05s, transform var(--lp-enter-ms) var(--lp-enter) 0.05s; }
+.lp-text-leave-active { position: absolute; left: 0; top: 12px; transition: opacity 0.16s ease-in, filter 0.16s ease-in, transform 0.2s ease-in; }
+.lp-text-enter-from { opacity: 0; filter: blur(6px); transform: translateY(8px); }
+.lp-text-leave-to { opacity: 0; filter: blur(4px); transform: translateY(-8px); }
+
+/* Iconwechsel */
+.lp-swap-enter-active { transition: opacity 0.25s ease-out, transform var(--lp-enter-ms) var(--lp-enter), filter 0.3s ease-out; }
+.lp-swap-leave-active { position: absolute; inset: 0; margin: auto; transition: opacity 0.15s ease-in, transform 0.2s ease-in, filter 0.15s ease-in; }
+.lp-swap-enter-from, .lp-swap-leave-to { opacity: 0; transform: scale(0.3); filter: blur(4px); }
+
+.lp-glyph { position: relative; display: grid; place-items: center; width: 24px; height: 24px; }
+.lp-glyph svg { width: 22px; height: 22px; overflow: visible; fill: none; stroke: var(--c); stroke-width: 2.1; stroke-linecap: round; stroke-linejoin: round; }
+.lp-glyph path { transform-box: fill-box; transform-origin: center; stroke-dasharray: 1; stroke-dashoffset: 1; animation: lp-draw 0.5s cubic-bezier(0.4, 0, 0.2, 1) 0.12s forwards; }
+.lp-glyph path + path { animation-duration: 0.32s; animation-delay: 0.42s; }
+.lp-glyph path + path + path { animation-delay: 0.5s; }
+.lp-glyph[data-type='loading'] svg { animation: lp-spin 0.8s linear infinite; }
+.lp-glyph[data-type='loading'] .lp-ring { stroke-dasharray: 0.26 0.74; stroke-dashoffset: 0; animation: none; }
+.lp-glyph[data-type='success'] svg { animation: lp-pulse 0.46s var(--lp-enter) 0.72s; }
+.lp-glyph[data-type='success']::after {
+    content: ''; position: absolute; inset: 2px; border-radius: 50%; border: 1.5px solid var(--c); opacity: 0;
+    animation: lp-ripple 0.7s cubic-bezier(0.2, 0, 0, 1) 0.72s;
+}
+.lp-glyph[data-type='error'] svg { animation: lp-shake 0.42s cubic-bezier(0.3, 0, 0.3, 1) 0.72s; }
+.lp-glyph[data-type='warning'] path:nth-child(2) { stroke-dasharray: none; stroke-dashoffset: 0; animation: lp-drop 0.5s var(--lp-enter) 0.42s both; }
+.lp-glyph[data-type='warning'] path:nth-child(3),
+.lp-glyph[data-type='info'] path:nth-child(3) { stroke-dasharray: none; stroke-dashoffset: 0; animation: lp-dot 0.4s var(--lp-enter) 0.56s both; }
+@keyframes lp-draw { to { stroke-dashoffset: 0; } }
+@keyframes lp-spin { to { transform: rotate(360deg); } }
+@keyframes lp-pulse { 40% { transform: scale(1.14); } }
+@keyframes lp-ripple { from { opacity: 0.5; transform: scale(1); } to { opacity: 0; transform: scale(1.9); } }
+@keyframes lp-shake { 20% { transform: translateX(-2.5px); } 45% { transform: translateX(2.5px); } 70% { transform: translateX(-1.5px); } to { transform: none; } }
+@keyframes lp-drop { from { opacity: 0; transform: translateY(-5px); } }
+@keyframes lp-dot { from { opacity: 0; transform: scale(0); } }
+
+/* Knöpfe: 30 px hoch, 7 px Rand zur Pille, dadurch laufen die Radien parallel (22 − 7 = 15) */
+.lp-actions { display: flex; flex: none; align-items: center; gap: 2px; padding-right: 7px; }
+.lp-btn {
+    position: relative; appearance: none; border: 0; margin: 0; height: 30px; padding: 0 13px; border-radius: 999px;
+    font: inherit; font-size: 13px; font-weight: 600; white-space: nowrap; color: var(--lp-bg); background: var(--lp-fg);
+    cursor: pointer; transition: background-color 0.15s ease-out, color 0.15s ease-out, transform 0.15s ease-out;
+}
+.lp-btn::before { content: ''; position: absolute; inset: -7px -2px; }
+.lp-btn:hover { background: color-mix(in oklab, var(--lp-fg) 82%, var(--lp-bg)); }
+.lp-btn:active { transform: scale(0.96); }
+.lp-btn-quiet { padding: 0 11px; color: var(--lp-sub); background: transparent; }
+.lp-btn-quiet:hover { color: var(--lp-fg); background: color-mix(in oklab, var(--lp-fg) 8%, transparent); }
+.lp-close {
+    position: relative; appearance: none; border: 0; margin: 0 0 0 -6px; padding: 0; width: 30px; height: 30px; border-radius: 50%;
+    display: grid; place-items: center; color: var(--lp-sub); background: transparent; cursor: pointer; transition: background-color 0.15s, color 0.15s;
+}
+.lp-close::before { content: ''; position: absolute; inset: -7px; }
+.lp-close:hover { color: var(--lp-fg); background: color-mix(in oklab, var(--lp-fg) 8%, transparent); }
+.lp-close svg { fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; pointer-events: none; }
+.lp-btn:focus-visible, .lp-close:focus-visible { outline: 2px solid var(--ring); outline-offset: 1px; }
+
+.lp-act-enter-active { transition: opacity 0.3s ease-out 0.1s, filter 0.3s ease-out 0.1s, transform var(--lp-enter-ms) var(--lp-enter) 0.1s; }
+.lp-act-leave-active { position: absolute; top: 0; right: 0; bottom: 0; transition: opacity 0.14s ease-in, filter 0.14s ease-in, transform 0.14s ease-in; }
+.lp-act-enter-from, .lp-act-leave-to { opacity: 0; filter: blur(4px); transform: scale(0.9); }
+
+.lp-progress { position: absolute; left: 0; right: 0; bottom: 0; height: 3px; background: color-mix(in oklab, var(--lp-fg) 10%, transparent); pointer-events: none; transition: opacity 0.25s; }
+.lp-progress i { position: absolute; inset: 0; background: var(--c); transform-origin: left; transition: transform 0.3s cubic-bezier(0.2, 0, 0, 1); }
+.lp-timer {
+    position: absolute; left: 0; right: 0; bottom: 0; height: 2px; background: var(--c); opacity: 0.5; transform-origin: left; pointer-events: none;
+    animation-name: lp-countdown; animation-timing-function: linear; animation-fill-mode: forwards;
+}
+@keyframes lp-countdown { from { transform: scaleX(1); } to { transform: scaleX(0); } }
+
+/* Warteschlange statt Auffächern: Hovern hält nur die Zeit an, die wartenden bleiben als Kanten hinter der vordersten */
+/* --lp-peek (0 bis 1) kommt vom Ziehen an der vordersten: alle wartenden rücken um so viel auf */
+.lp-toaster [data-sonner-toast][data-mounted='true'][data-front='false'] {
+    --lp-pos: max(0, var(--toasts-before) - var(--lp-peek, 0));
+    --y: translateY(calc(var(--lift-amount) * var(--lp-pos))) scale(calc(1 - var(--lp-pos) * 0.05));
+    height: var(--front-toast-height);
+}
+.lp-toaster [data-sonner-toast][data-mounted='true'][data-removed='true'][data-front='false'][data-swipe-out='false'] {
+    --y: translateY(calc(var(--lift-amount) * var(--toasts-before))) scale(calc(1 - var(--toasts-before) * 0.05));
+    opacity: 0;
+}
+.lp-toaster [data-sonner-toast][data-front='false'] .lp {
+    width: var(--lp-front-w, var(--lp-own-w)) !important;
+    height: var(--front-toast-height) !important;
+    pointer-events: none;
+}
+.lp-toaster [data-sonner-toast][data-front='false'] :is(.lp-inner, .lp-progress, .lp-timer) { opacity: 0; }
+/* die übrigen Kanten gleichen sich beim Ziehen an die nachrückende an */
+.lp-toaster [data-sonner-toast][data-front='false']:not([data-index='1']) .lp {
+    width: calc(var(--lp-front-w, var(--lp-own-w)) + (var(--lp-next-w, var(--lp-front-w, var(--lp-own-w))) - var(--lp-front-w, var(--lp-own-w))) * var(--lp-peek, 0)) !important;
+    height: calc(var(--front-toast-height) + (var(--lp-next-h, var(--front-toast-height)) - var(--front-toast-height)) * var(--lp-peek, 0)) !important;
+}
+/* die nächste wächst beim Ziehen auf ihre eigene Größe und wird lesbar */
+.lp-toaster [data-sonner-toast][data-index='1'] .lp {
+    width: calc(var(--lp-front-w, var(--lp-own-w)) + (var(--lp-own-w) - var(--lp-front-w, var(--lp-own-w))) * var(--lp-peek, 0)) !important;
+    height: calc(var(--front-toast-height) + (var(--lp-own-h) - var(--front-toast-height)) * var(--lp-peek, 0)) !important;
+}
+.lp-toaster [data-sonner-toast][data-index='1'] :is(.lp-inner, .lp-progress, .lp-timer) { opacity: var(--lp-peek, 0); }
+/* während des Ziehens folgen die Pille und die wartenden dem Zeiger direkt, beim Loslassen federn sie */
+.lp-toaster[data-lp-dragging] [data-sonner-toast][data-front='false'],
+.lp-toaster[data-lp-dragging] [data-sonner-toast][data-front='false'] :is(.lp, .lp-inner) { transition: none; }
+.lp.is-dragging { cursor: grabbing; transition: width var(--lp-morph-ms) var(--lp-morph), height var(--lp-morph-ms) var(--lp-morph); }
+/* geworfen: fliegt in Wurfrichtung weiter und blendet aus */
+.lp.is-flung { opacity: 0; pointer-events: none; transition: translate 0.34s cubic-bezier(0.2, 0.8, 0.3, 1), opacity 0.26s ease-out; }
+/* wachsen zur Mitte hin: unten nach oben, oben nach unten */
+.lp-toaster [data-sonner-toast][data-styled='false'][data-y-position='bottom'] { align-items: flex-end; }
+.lp-toaster [data-sonner-toast][data-styled='false'][data-y-position='top'] { align-items: flex-start; }
+
+/* Schließen: Text verschwimmt, die Pille zieht sich zur Form zusammen */
+.lp-toaster [data-sonner-toast][data-removed='true'] .lp {
+    width: 44px !important; opacity: 0; transform: scale(0.92);
+    transition: width 0.2s cubic-bezier(0.5, 0, 0.75, 0), opacity 0.18s ease-in 0.03s, transform 0.2s ease-in;
+}
+.lp-toaster [data-sonner-toast][data-removed='true'] .lp-inner { opacity: 0; filter: blur(3px); transition: opacity 0.1s, filter 0.1s; }
+
+@media (prefers-reduced-motion: reduce) {
+    .lp, .lp *:not(.lp-timer), .lp-toaster [data-sonner-toast] { animation-duration: 1ms !important; animation-delay: 0s !important; transition-duration: 1ms !important; transition-delay: 0s !important; }
+    .lp-glyph[data-type='loading'] svg { animation: none !important; }
+}
+
+/* Waiting pills follow the dragged pill's curve when it springs back (see header). */
+.lp-toaster [data-sonner-toast][data-front='false'] .lp {
+    transition: width var(--lp-enter-ms) var(--lp-enter), height var(--lp-enter-ms) var(--lp-enter);
+}
+.lp-toaster [data-sonner-toast][data-index='1'] .lp-inner { transition: opacity var(--lp-enter-ms) var(--lp-enter); }

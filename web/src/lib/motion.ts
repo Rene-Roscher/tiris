@@ -9,6 +9,8 @@
 import { spring } from './vendor/spring.js'
 
 const CURVES = { settle: { duration: 0.3, bounce: 0 }, calm: { duration: 0.35, bounce: 0 } } as const
+/* Toast pill springs, as in the ui-motion toast example (bounce 0.31 / 0.24 / 0.05: the pill's own exception). */
+const PILL = { enter: { stiffness: 300, damping: 24 }, morph: { stiffness: 340, damping: 28 }, stack: { stiffness: 400, damping: 38 } } as const
 
 export function installSprings() {
   if (typeof CSS === 'undefined' || !CSS.supports('transition-timing-function', 'linear(0, 1)')) return
@@ -17,5 +19,10 @@ export function installSprings() {
     const s = spring(opts)
     root.setProperty(`--ease-${name}`, s.easing)
     root.setProperty(`--ease-${name}-ms`, `${s.ms}ms`)
+  }
+  for (const [name, opts] of Object.entries(PILL)) {
+    const s = spring(opts)
+    root.setProperty(`--lp-${name}`, s.easing)
+    root.setProperty(`--lp-${name}-ms`, `${s.ms}ms`)
   }
 }
