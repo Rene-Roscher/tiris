@@ -9,6 +9,7 @@ The fake plugs follow the documented library rules and what real P110 plugs did 
 Run:  TIRIS_TEST_DATABASE_URL=postgresql://user:pw@host:port/empty_db  uv run pytest
 The tests drop and recreate the schema of that database. Never point it at real data.
 """
+
 from __future__ import annotations
 
 import os
@@ -32,6 +33,7 @@ NOW = datetime(2026, 11, 21, 0, 20, tzinfo=TZ)
 
 
 # ----------------------------------------------------------------------------- fake plug
+
 
 def hour_wh(seed: int, utc_start: datetime) -> int:
     n = int(utc_start.timestamp()) // 3600
@@ -109,9 +111,9 @@ class FakePlug:
                 wall = datetime.combine(d, time(hh))
                 a, b = wall.replace(tzinfo=TZ, fold=0), wall.replace(tzinfo=TZ, fold=1)
                 if a.utcoffset() != b.utcoffset() and a.astimezone(UTC).astimezone(TZ).replace(tzinfo=None) == wall:
-                    st, real = a.astimezone(UTC), [a.astimezone(UTC), b.astimezone(UTC)]      # fall back: one entry
+                    st, real = a.astimezone(UTC), [a.astimezone(UTC), b.astimezone(UTC)]  # fall back: one entry
                 elif a.astimezone(UTC).astimezone(TZ).replace(tzinfo=None) != wall:
-                    st, real = (wall + H).replace(tzinfo=TZ).astimezone(UTC), []              # spring forward
+                    st, real = (wall + H).replace(tzinfo=TZ).astimezone(UTC), []  # spring forward
                 else:
                     st, real = a.astimezone(UTC), [a.astimezone(UTC)]
                 if st > self.now_local.astimezone(UTC):
@@ -125,11 +127,17 @@ class FakePlug:
 
     def _daily(self, start: date, end: date):
         out, d = [], start
-        shift = timedelta(days=30) if self.shift_old_daily and start < self.today - timedelta(days=365) else timedelta(0)
+        shift = (
+            timedelta(days=30) if self.shift_old_daily and start < self.today - timedelta(days=365) else timedelta(0)
+        )
         while d <= end and d <= self.today:
             src = d - shift
-            out.append(SimpleNamespace(start_date_time=datetime.combine(d, time(0), TZ).astimezone(UTC),
-                                       energy=self.true_day(src) if self.keeps_day(src) else 0))
+            out.append(
+                SimpleNamespace(
+                    start_date_time=datetime.combine(d, time(0), TZ).astimezone(UTC),
+                    energy=self.true_day(src) if self.keeps_day(src) else 0,
+                )
+            )
             d += timedelta(days=1)
         return out
 
@@ -139,8 +147,12 @@ class FakePlug:
             m = date(start.year, mo, 1)
             if m > end or m > self.today:
                 break
-            out.append(SimpleNamespace(start_date_time=datetime.combine(m, time(0), TZ).astimezone(UTC),
-                                       energy=self.true_month(m) if self.keeps_month(m) else 0))
+            out.append(
+                SimpleNamespace(
+                    start_date_time=datetime.combine(m, time(0), TZ).astimezone(UTC),
+                    energy=self.true_month(m) if self.keeps_month(m) else 0,
+                )
+            )
         return out
 
     async def get_energy_data(self, interval, start_date, end_date=None, timezone=None):
@@ -148,31 +160,54 @@ class FakePlug:
         self.calls.append((str(interval), start_date, end_date))
         if interval == EnergyDataInterval.Hourly:
             assert (end_date - start_date).days + 1 <= 8, "hourly window > 8 days"
-            entries, newest, gen = self._hourly(start_date, end_date), (self.today - timedelta(days=7), self.today), self._hourly
+            entries, newest, gen = (
+                self._hourly(start_date, end_date),
+                (self.today - timedelta(days=7), self.today),
+                self._hourly,
+            )
         elif interval == EnergyDataInterval.Daily:
             assert start_date == history.quarter_start(start_date), f"daily start not a quarter start: {start_date}"
-            entries, newest, gen = self._daily(start_date, end_date), (history.quarter_start(self.today), self.today), self._daily
+            entries, newest, gen = (
+                self._daily(start_date, end_date),
+                (history.quarter_start(self.today), self.today),
+                self._daily,
+            )
         else:
             assert (start_date.month, start_date.day) == (1, 1), "monthly start not a year start"
-            entries, newest, gen = self._monthly(start_date, end_date), (date(self.today.year, 1, 1), self.today), self._monthly
+            entries, newest, gen = (
+                self._monthly(start_date, end_date),
+                (date(self.today.year, 1, 1), self.today),
+                self._monthly,
+            )
         if self.liar and start_date < newest[0]:
             buf = gen(*newest)
-            entries = [SimpleNamespace(start_date_time=e.start_date_time, energy=buf[i].energy if i < len(buf) else 0)
-                       for i, e in enumerate(entries)]
+            entries = [
+                SimpleNamespace(start_date_time=e.start_date_time, energy=buf[i].energy if i < len(buf) else 0)
+                for i, e in enumerate(entries)
+            ]
         if self.wiped:
             entries = [SimpleNamespace(start_date_time=e.start_date_time, energy=0) for e in entries]
         return SimpleNamespace(entries=entries)
 
 
 def target(did: str, dev: FakePlug) -> history.EnergyTarget:
-    t = history.EnergyTarget(device_id=did, nickname=did, model="P110", handler=dev, ip=f"192.0.2.{dev.seed}",
-                             mac="AA", fw_ver="1.4.8", hw_ver="1.0")
-    t.address = (t.ip, 80)   # what discovery results carry
+    t = history.EnergyTarget(
+        device_id=did,
+        nickname=did,
+        model="P110",
+        handler=dev,
+        ip=f"192.0.2.{dev.seed}",
+        mac="AA",
+        fw_ver="1.4.8",
+        hw_ver="1.0",
+    )
+    t.address = (t.ip, 80)  # what discovery results carry
     return t
 
 
 class FakePlugs:
     """Stands in for PlugPool: discovery returns the given targets (some only on the second attempt)."""
+
     def __init__(self, targets: list, lazy: frozenset = frozenset()):
         self.targets, self.lazy, self.calls, self.adopted = targets, lazy, 0, {}
 
@@ -186,6 +221,7 @@ class FakePlugs:
 
 
 # ----------------------------------------------------------------------------- harness
+
 
 @pytest.fixture
 def pool():
@@ -225,6 +261,7 @@ def q(pool, sql, params=None):
 
 # ----------------------------------------------------------------------------- scenarios
 
+
 async def test_first_run_backfill(pool, fake_clock):
     old, new = FakePlug(seed=1, installed=date(2024, 6, 1)), FakePlug(seed=2, installed=NOW.date() - timedelta(days=20))
     t_old, t_new = target("dev-old", old), target("dev-new", new)
@@ -245,14 +282,14 @@ async def test_first_run_backfill(pool, fake_clock):
     assert len(months) == 12 and all(months[m] == old.true_month(m) for m in months)
     nd = dict(q(pool, "SELECT day, wh FROM energy_daily WHERE device_id = 'dev-new' AND wh > 0"))
     assert min(nd) == new.installed
-    assert len(old.calls) == 11, old.calls          # backfill: monthly 4, daily 4, hourly 3
+    assert len(old.calls) == 11, old.calls  # backfill: monthly 4, daily 4, hourly 3
 
     before = q(pool, "SELECT COUNT(*), SUM(wh) FROM energy_daily")
     r = await run(pool, fake_clock, [t_old, t_new], NOW)
-    assert r["status"] == "ok" and len(old.calls) == 5      # normal run: 5 requests
+    assert r["status"] == "ok" and len(old.calls) == 5  # normal run: 5 requests
     assert q(pool, "SELECT COUNT(*), SUM(wh) FROM energy_daily") == before
 
-    old.wiped = True                                         # "delete energy data" in the app
+    old.wiped = True  # "delete energy data" in the app
     await run(pool, fake_clock, [t_old, t_new], NOW)
     assert q(pool, "SELECT COUNT(*), SUM(wh) FROM energy_daily") == before
 
@@ -261,7 +298,7 @@ async def test_daily_operation_and_outage(pool, fake_clock):
     dev = FakePlug(seed=3, installed=date(2025, 1, 1))
     t = target("dev-ops", dev)
     start = (NOW - timedelta(days=40)).date()
-    for i in range(31):   # 31 days of daily runs across the end of DST (2026-10-25)
+    for i in range(31):  # 31 days of daily runs across the end of DST (2026-10-25)
         r = await run(pool, fake_clock, [t], datetime.combine(start + timedelta(days=i), time(0, 20), TZ))
         assert r["status"] == "ok"
     last = datetime.combine(start + timedelta(days=30), time(0, 20), TZ)
@@ -269,25 +306,40 @@ async def test_daily_operation_and_outage(pool, fake_clock):
     span = q(pool, "SELECT MAX(ts) - MIN(ts) FROM energy_hourly WHERE device_id = 'dev-ops'")[0][0]
     assert span.days >= 37
     days = dict(q(pool, "SELECT day, wh FROM energy_daily WHERE device_id = 'dev-ops' AND day < %s", (last.date(),)))
-    assert not [d for d, wh in days.items() if wh != dev.true_day(d) and dev.keeps_day(d)]   # partial values grew to final
+    assert not [
+        d for d, wh in days.items() if wh != dev.true_day(d) and dev.keeps_day(d)
+    ]  # partial values grew to final
     oct25 = date(2026, 10, 25)
-    n = q(pool, "SELECT COUNT(*) FROM energy_hourly WHERE device_id = 'dev-ops' "
-                "AND (ts AT TIME ZONE 'Europe/Berlin')::date = %s", (oct25,))[0][0]
+    n = q(
+        pool,
+        "SELECT COUNT(*) FROM energy_hourly WHERE device_id = 'dev-ops' "
+        "AND (ts AT TIME ZONE 'Europe/Berlin')::date = %s",
+        (oct25,),
+    )[0][0]
     assert n == 24 and days[oct25] == dev.true_day(oct25)
 
-    after = datetime.combine(last.date() + timedelta(days=9), time(0, 20), TZ)   # 9 days down
+    after = datetime.combine(last.date() + timedelta(days=9), time(0, 20), TZ)  # 9 days down
     assert (await run(pool, fake_clock, [t], after))["status"] == "ok"
-    gap_days = q(pool, """SELECT g::date FROM generate_series(%s::date, %s::date - 1, interval '1 day') g
-                          WHERE NOT EXISTS (SELECT 1 FROM energy_daily WHERE device_id = 'dev-ops' AND day = g::date)""",
-                 (last.date(), after.date()))
-    assert gap_days == []                          # days survive a 9-day outage, hours do not (device keeps 7)
+    gap_days = q(
+        pool,
+        """SELECT g::date FROM generate_series(%s::date, %s::date - 1, interval '1 day') g
+                          WHERE NOT EXISTS (SELECT 1 FROM energy_daily
+                                            WHERE device_id = 'dev-ops' AND day = g::date)""",
+        (last.date(), after.date()),
+    )
+    assert gap_days == []  # days survive a 9-day outage, hours do not (device keeps 7)
 
 
 async def test_spring_forward(pool, fake_clock):
     dev = FakePlug(seed=4, installed=date(2025, 1, 1))
-    assert (await run(pool, fake_clock, [target("dev-dst", dev)], datetime(2026, 4, 2, 0, 20, tzinfo=TZ)))["status"] == "ok"
-    n, s = q(pool, "SELECT COUNT(*), SUM(wh) FROM energy_hourly WHERE device_id = 'dev-dst' "
-                   "AND (ts AT TIME ZONE 'Europe/Berlin')::date = '2026-03-29'")[0]
+    assert (await run(pool, fake_clock, [target("dev-dst", dev)], datetime(2026, 4, 2, 0, 20, tzinfo=TZ)))[
+        "status"
+    ] == "ok"
+    n, s = q(
+        pool,
+        "SELECT COUNT(*), SUM(wh) FROM energy_hourly WHERE device_id = 'dev-dst' "
+        "AND (ts AT TIME ZONE 'Europe/Berlin')::date = '2026-03-29'",
+    )[0]
     assert n == 23 and s == dev.true_day(date(2026, 3, 29))
 
 
@@ -333,4 +385,4 @@ async def test_missing_plug_and_auth_error(pool, fake_clock):
     assert r["status"] == "partial" and any("not reachable" in e for e in r["errors"])
     b.auth_fail = True
     r = await run(pool, fake_clock, [ta, tb], NOW)
-    assert r["status"] == "partial" and b.calls == []          # auth errors are never retried (TPAP lockout)
+    assert r["status"] == "partial" and b.calls == []  # auth errors are never retried (TPAP lockout)
