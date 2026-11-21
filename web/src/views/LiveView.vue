@@ -8,11 +8,10 @@ import { useI18n } from 'vue-i18n'
 import { RouterLink } from 'vue-router'
 import EChart from '@/components/charts/EChart.vue'
 import Sparkline from '@/components/charts/Sparkline.vue'
-import PageHeader from '@/components/PageHeader.vue'
-import Panel from '@/components/Panel.vue'
+import Section from '@/components/Section.vue'
+import Segmented from '@/components/Segmented.vue'
 import StateMessage from '@/components/StateMessage.vue'
 import { Button } from '@/components/ui/button'
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useChartTheme } from '@/composables/useChartTheme'
 import { useLive } from '@/composables/useLive'
 import { api } from '@/lib/api'
@@ -24,6 +23,7 @@ const theme = useChartTheme()
 const live = useLive()
 const WINDOWS = [60, 300, 900] as const
 const win = ref<number>(300)
+const winOptions = computed(() => WINDOWS.map((w) => ({ value: w, label: t(`live.window.m${w / 60}`) })))
 
 const meta = useQuery({ queryKey: ['overview', 7, null], queryFn: () => api.get<Overview>('/api/overview?days=7'), staleTime: 5 * 60_000 })
 const price = computed(() => meta.data.value?.price ?? null)
@@ -44,27 +44,26 @@ const span = computed(() => {
 
 function lineOption(points: [number, number][], opts: { from: number; to: number; band?: [number, number][]; seconds?: boolean }): EChartsOption {
   const th = theme.value
-  const accent = th.token('chart-1')
+  const accent = th.token('primary')
   return {
     ...th.base,
-    grid: { left: 8, right: 64, top: 28, bottom: 4, containLabel: true },
+    grid: { left: 0, right: 0, top: 8, bottom: 0, containLabel: true },
     tooltip: { ...th.base.tooltip, trigger: 'axis', axisPointer: { type: 'line', lineStyle: { color: th.token('caption') } },
       formatter: (ps: unknown) => {
         const arr = ps as { value: [number, number]; seriesName: string }[]
         const head = time(arr[0]!.value[0] / 1000, opts.seconds)
         return [`<b>${head}</b>`, ...arr.map((p) => `${p.seriesName}: ${watts(p.value[1])}`)].join('<br>')
       } },
-    xAxis: { type: 'time', min: opts.from * 1000, max: opts.to * 1000, axisLine: th.base.axisCommon.axisLine, splitLine: { show: false },
-      axisLabel: { ...th.base.axisCommon.axisLabel, hideOverlap: true, formatter: (v: number) => time(v / 1000, opts.seconds) } },
-    yAxis: { type: 'value', min: 0, splitLine: th.base.axisCommon.splitLine, name: 'W', nameGap: 12,
-      nameTextStyle: { color: th.token('caption'), align: 'left' },
-      axisLabel: { ...th.base.axisCommon.axisLabel, formatter: (v: number) => (v >= 1000 ? `${num(v / 1000, 1)}k` : num(v)) } },
+    xAxis: { type: 'time', min: opts.from * 1000, max: opts.to * 1000, axisLine: { show: false }, axisTick: { show: false }, splitLine: { show: false },
+      axisLabel: { color: th.token('caption'), fontSize: 11, hideOverlap: true, formatter: (v: number) => time(v / 1000, opts.seconds) } },
+    yAxis: { type: 'value', min: 0, position: 'right', splitNumber: 3, splitLine: th.base.axisCommon.splitLine,
+      axisLabel: { color: th.token('caption'), fontSize: 11, formatter: (v: number) => (v >= 1000 ? `${num(v / 1000, 1)}${NBSP}kW` : `${num(v)}${NBSP}W`) } },
     series: [
       ...(opts.band ? [{ type: 'line' as const, name: t('live.peak'), data: opts.band.map(([x, y]) => [x * 1000, y]), showSymbol: false,
         lineStyle: { width: 0 }, areaStyle: { color: accent, opacity: 0.12 }, connectNulls: false, z: 1 }] : []),
       { type: 'line', name: opts.band ? t('live.avg') : t('live.total'), data: points.map(([x, y]) => [x * 1000, y]), showSymbol: false,
-        lineStyle: { width: 2, color: accent }, areaStyle: { color: accent, opacity: 0.08 }, connectNulls: false, z: 2,
-        endLabel: opts.band ? undefined : { show: true, color: th.token('foreground'), fontWeight: 600, formatter: (p: { value?: unknown }) => watts((p.value as [number, number])[1]) } },
+        lineStyle: { width: 1.5, color: accent }, connectNulls: false, z: 2,
+        areaStyle: { color: { type: 'linear', x: 0, y: 0, x2: 0, y2: 1, colorStops: [{ offset: 0, color: `${accent}38` }, { offset: 1, color: `${accent}00` }] } } },
     ],
   }
 }
@@ -98,6 +97,8 @@ const cards = computed(() => {
   })
 })
 const activeCount = computed(() => cards.value.filter((c) => c.st === 'on').length)
+const drawing = computed(() => cards.value.filter((c) => c.st === 'on' || c.st === 'standby'))
+const resting = computed(() => cards.value.filter((c) => c.st === 'idle' || c.st === 'offline'))
 
 // --- day view from the minute aggregate
 const today = () => new Date().toLocaleDateString('sv-SE')
@@ -144,89 +145,112 @@ const perHour = (w: number | null | undefined) => (w == null || price.value == n
 </script>
 
 <template>
-  <PageHeader :title="t('live.title')" />
+  <div class="mb-7 flex h-9 items-center justify-between gap-3">
+    <h1 class="font-semibold">{{ t('live.title') }}</h1>
+    <p v-if="live.enabled.value" class="flex items-center gap-2 text-sm text-caption">
+      <span class="size-1.5 shrink-0 rounded-full" :class="live.connected.value ? 'bg-good-fill' : 'bg-caption'" aria-hidden="true" />
+      {{ live.connected.value ? t('live.connected', { s: snap?.interval_s ?? 2 }) : t('live.connecting') }}
+    </p>
+  </div>
 
   <StateMessage v-if="!live.enabled.value" kind="setup" :title="t('states.noTapoTitle')" :body="t('states.noTapoBody')" />
 
-  <div v-else class="flex flex-col gap-4">
-    <section class="grid gap-6 rounded-lg border border-border bg-card p-6 lg:grid-cols-[minmax(240px,0.8fr)_2fr]">
-      <div class="flex min-w-0 flex-col">
-        <p class="flex items-center gap-2 text-sm text-muted-foreground">
-          <span class="size-2 shrink-0 rounded-full" :class="live.connected.value ? 'bg-good-fill' : 'bg-caption'" aria-hidden="true" />
-          {{ live.connected.value ? t('live.connected', { s: snap?.interval_s ?? 2 }) : t('live.connecting') }}
-        </p>
-        <p class="mt-2 text-4xl font-semibold tabular" aria-live="off">
-          {{ totalW == null ? '–' : num(totalW, totalW < 100 ? 1 : 0) }}<span class="ml-2 text-lg font-medium text-muted-foreground">W</span>
-        </p>
-        <div v-if="price != null && totalW != null" class="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground">
-          <span>{{ t('live.perHour', { value: money(perHour(totalW)) }) }}</span>
-          <span>{{ t('live.perDay', { value: money(perHour(totalW)! * 24) }) }}</span>
-          <span>{{ t('live.perMonth', { value: money(perHour(totalW)! * 24 * 30.4, 0) }) }}</span>
+  <div v-else class="flex flex-col divide-y divide-border">
+    <section class="pb-8">
+      <div class="flex flex-wrap items-end justify-between gap-x-10 gap-y-5">
+        <div class="min-w-0">
+          <p class="text-xs font-medium text-caption">{{ t('live.total') }}</p>
+          <p class="mt-2 text-4xl font-semibold tabular" aria-live="off">
+            {{ totalW == null ? '–' : num(totalW, totalW < 100 ? 1 : 0) }}<span class="ml-1 text-lg font-medium tracking-normal text-caption">W</span>
+          </p>
+          <p v-if="price != null && totalW != null" class="mt-2 text-sm text-muted-foreground tabular">
+            {{ t('live.perHour', { value: money(perHour(totalW)) }) }} · {{ t('live.perDay', { value: money(perHour(totalW)! * 24) }) }} · {{ t('live.perMonth', { value: money(perHour(totalW)! * 24 * 30.4, 0) }) }}
+          </p>
         </div>
-        <div class="min-h-6 flex-1" aria-hidden="true" />
-        <dl class="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
-          <div><dt class="text-muted-foreground">{{ t('live.voltage') }}</dt><dd class="text-md font-semibold tabular">{{ avgV ? `${num(avgV, 1)}${NBSP}V` : '–' }}</dd></div>
-          <div><dt class="text-muted-foreground">{{ t('live.online') }}</dt><dd class="text-md font-semibold tabular">{{ snap?.online ?? '–' }}/{{ snap?.known ?? '–' }}</dd></div>
-          <div><dt class="text-muted-foreground">{{ t('live.active') }}</dt><dd class="text-md font-semibold tabular">{{ activeCount }}</dd></div>
-          <div v-if="span"><dt class="text-muted-foreground">{{ t('live.span', { window: t(`live.window.m${win / 60}`) }) }}</dt>
-            <dd class="text-md font-semibold tabular">{{ watts(span.lo) }} – {{ watts(span.hi) }}</dd></div>
+        <dl class="grid grid-cols-2 gap-x-8 gap-y-3 text-sm sm:flex sm:gap-0 sm:divide-x sm:divide-border">
+          <div class="sm:px-6 sm:first:pl-0"><dt class="text-xs text-caption">{{ t('live.voltage') }}</dt><dd class="mt-1 font-semibold tabular">{{ avgV ? `${num(avgV, 1)}${NBSP}V` : '–' }}</dd></div>
+          <div class="sm:px-6"><dt class="text-xs text-caption">{{ t('live.online') }}</dt><dd class="mt-1 font-semibold tabular">{{ snap?.online ?? '–' }}/{{ snap?.known ?? '–' }}</dd></div>
+          <div class="sm:px-6"><dt class="text-xs text-caption">{{ t('live.active') }}</dt><dd class="mt-1 font-semibold tabular">{{ activeCount }}</dd></div>
+          <div v-if="span" class="sm:pl-6"><dt class="text-xs text-caption">{{ t('live.span', { window: t(`live.window.m${win / 60}`) }) }}</dt>
+            <dd class="mt-1 font-semibold tabular">{{ watts(span.lo) }} – {{ watts(span.hi) }}</dd></div>
         </dl>
       </div>
-      <div class="min-w-0">
-        <div class="mb-1 flex items-center justify-between gap-2">
-          <h2 class="font-medium">{{ t('live.total') }}</h2>
-          <Tabs :model-value="String(win)" @update:model-value="(v) => (win = Number(v))">
-            <TabsList>
-              <TabsTrigger v-for="w in WINDOWS" :key="w" :value="String(w)">{{ t(`live.window.m${w / 60}`) }}</TabsTrigger>
-            </TabsList>
-          </Tabs>
-        </div>
-        <EChart :option="liveOption" :height="260" :label="t('live.total')" />
+      <div class="mb-3 mt-8 flex items-center justify-end">
+        <Segmented v-model="win" :options="winOptions" :label="t('live.windowLabel')" />
       </div>
+      <EChart :option="liveOption" :height="240" :label="t('live.total')" />
     </section>
 
-    <section class="grid grid-cols-[repeat(auto-fill,minmax(240px,1fr))] gap-3">
-      <article v-for="c in cards" :key="c.id" class="flex min-w-0 flex-col gap-2 rounded-lg border border-border bg-card px-4 py-3.5">
-        <header class="flex items-start gap-2 text-sm">
-          <span class="mt-1.5 size-2 shrink-0 rounded-full" :style="{ background: theme.slotColor(c.slot) }" aria-hidden="true" />
-          <RouterLink :to="`/devices/${c.id}`" class="min-w-0 flex-1 font-medium [overflow-wrap:anywhere] hover:underline">{{ c.name }}</RouterLink>
-          <span class="shrink-0 rounded-full px-2 py-px text-xs"
-                :class="c.st === 'on' ? 'bg-selection font-medium text-foreground' : 'bg-muted text-muted-foreground'">{{ t(`live.status.${c.st}`) }}</span>
-        </header>
-        <p class="text-2xl font-semibold tabular" :class="c.st === 'idle' || c.st === 'offline' ? 'text-caption' : ''">{{ c.live ? watts(c.live.w) : '–' }}</p>
-        <Sparkline :values="c.spark" :width="240" :height="32" class="w-full" />
-        <div class="h-1 overflow-hidden rounded-full bg-muted" :aria-label="`${num(c.share * 100)} %`">
-          <div class="h-full w-full origin-left rounded-full bg-primary transition-transform duration-(--ease-settle-ms) ease-settle"
-               :style="{ transform: `scaleX(${c.share.toFixed(3)})` }" />
-        </div>
-        <dl class="grid grid-cols-2 gap-x-3 gap-y-1 text-xs">
-          <div class="flex justify-between gap-2"><dt class="text-caption">{{ t('live.current') }}</dt><dd class="tabular text-muted-foreground">{{ c.live ? `${num(c.live.a, 2)}${NBSP}A` : '–' }}</dd></div>
-          <div class="flex justify-between gap-2"><dt class="text-caption">V</dt><dd class="tabular text-muted-foreground">{{ c.live ? num(c.live.v, 1) : '–' }}</dd></div>
-          <div class="flex justify-between gap-2"><dt class="text-caption" :title="t('live.pf')">cos φ</dt><dd class="tabular text-muted-foreground">{{ c.live?.pf != null ? num(c.live.pf, 2) : '–' }}</dd></div>
-          <div v-if="price != null" class="flex justify-between gap-2"><dt class="text-caption">{{ t('live.cost') }}</dt>
-            <dd class="tabular text-muted-foreground">{{ c.live ? `${num(perHour(c.live.w)! * 100, 2)}${NBSP}ct/h` : '–' }}</dd></div>
-        </dl>
-      </article>
-    </section>
+    <Section :title="t('live.devices')" :summary="t('live.devicesSub')">
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead>
+            <tr class="text-xs text-caption">
+              <th class="h-8 pr-3 text-left font-medium">{{ t('overview.col.device') }}</th>
+              <th class="px-3 text-right font-medium">{{ t('overview.col.now') }}</th>
+              <th class="hidden px-3 text-left font-medium md:table-cell">{{ t('live.last5') }}</th>
+              <th class="hidden px-3 text-right font-medium sm:table-cell">{{ t('overview.col.share') }}</th>
+              <th class="hidden px-3 text-right font-medium lg:table-cell">{{ t('live.current') }}</th>
+              <th class="hidden px-3 text-right font-medium lg:table-cell">V</th>
+              <th class="hidden px-3 text-right font-medium lg:table-cell" :title="t('live.pf')">cos φ</th>
+              <th v-if="price != null" class="pl-3 text-right font-medium">{{ t('live.cost') }}</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="c in drawing" :key="c.id" class="h-12 border-t border-border">
+              <td class="max-w-64 pr-3">
+                <RouterLink :to="`/devices/${c.id}`" class="flex min-w-0 items-center gap-2.5 font-medium hover:underline">
+                  <span class="size-1.5 shrink-0 rounded-full bg-good-fill" aria-hidden="true" />
+                  <span class="truncate" :title="c.name">{{ c.name }}</span>
+                  <span v-if="c.st === 'standby'" class="shrink-0 text-xs font-normal text-caption">{{ t('live.status.standby') }}</span>
+                </RouterLink>
+              </td>
+              <td class="px-3 text-right text-md font-semibold tabular">{{ c.live ? watts(c.live.w) : '–' }}</td>
+              <td class="hidden px-3 md:table-cell"><Sparkline :values="c.spark" :width="160" :height="26" /></td>
+              <td class="hidden px-3 sm:table-cell">
+                <span class="flex items-center justify-end gap-2.5">
+                  <span class="h-1 w-16 overflow-hidden rounded-full bg-border" aria-hidden="true">
+                    <span class="block h-full origin-left rounded-full bg-primary transition-transform duration-(--ease-settle-ms) ease-settle" :style="{ transform: `scaleX(${c.share.toFixed(3)})` }" />
+                  </span>
+                  <span class="w-10 text-right text-muted-foreground tabular">{{ num(c.share * 100) }}{{ NBSP }}%</span>
+                </span>
+              </td>
+              <td class="hidden px-3 text-right text-muted-foreground tabular lg:table-cell">{{ c.live ? `${num(c.live.a, 2)}${NBSP}A` : '–' }}</td>
+              <td class="hidden px-3 text-right text-muted-foreground tabular lg:table-cell">{{ c.live ? num(c.live.v, 1) : '–' }}</td>
+              <td class="hidden px-3 text-right text-muted-foreground tabular lg:table-cell">{{ c.live?.pf != null ? num(c.live.pf, 2) : '–' }}</td>
+              <td v-if="price != null" class="pl-3 text-right tabular">{{ c.live ? `${num(perHour(c.live.w)! * 100, 2)}${NBSP}ct/h` : '–' }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <p v-if="resting.length" class="mt-4 text-sm text-caption">
+        <span class="font-medium text-muted-foreground">{{ t('live.resting', { n: resting.length }) }}</span>
+        <template v-for="(c, i) in resting" :key="c.id">
+          {{ i ? ', ' : ' ' }}<RouterLink :to="`/devices/${c.id}`" class="hover:text-foreground hover:underline">{{ c.name }}</RouterLink>
+        </template>
+      </p>
+    </Section>
 
-    <Panel :title="t('live.day', { day: dayLabel })" :description="t('live.daySub')">
+    <Section :title="t('live.day', { day: dayLabel })" :summary="t('live.daySub')">
       <template #actions>
-        <Button type="button" variant="outline" size="icon-sm" :aria-label="t('live.prevDay')" @click="shiftDay(-1)"><ChevronLeft class="size-4" /></Button>
-        <input v-model="day" type="date" :max="today()" class="h-8 rounded-md border border-input bg-card px-2 text-sm" :aria-label="t('common.date')" />
-        <Button type="button" variant="outline" size="icon-sm" :aria-label="t('live.nextDay')" :disabled="day >= today()" @click="shiftDay(1)"><ChevronRight class="size-4" /></Button>
+        <div class="flex items-center gap-1">
+          <Button type="button" variant="ghost" size="icon-sm" :aria-label="t('live.prevDay')" @click="shiftDay(-1)"><ChevronLeft class="size-4" /></Button>
+          <input v-model="day" type="date" :max="today()" class="h-8 rounded-md border border-input bg-background px-2 text-sm" :aria-label="t('common.date')" />
+          <Button type="button" variant="ghost" size="icon-sm" :aria-label="t('live.nextDay')" :disabled="day >= today()" @click="shiftDay(1)"><ChevronRight class="size-4" /></Button>
+        </div>
       </template>
-      <dl v-if="dayStats" class="mb-3 grid grid-cols-2 gap-4 text-sm md:grid-cols-4">
-        <div><dt class="text-muted-foreground">{{ t('live.measured') }}</dt><dd class="text-md font-semibold tabular">{{ num(dayStats.wh / 1000, 2) }}{{ NBSP }}kWh</dd>
-          <dd class="text-caption">{{ dayStats.minutes }} min<template v-if="price != null">, {{ money(dayStats.wh / 1000 * price) }}</template></dd></div>
-        <div><dt class="text-muted-foreground">{{ t('live.avg') }}</dt><dd class="text-md font-semibold tabular">{{ watts(dayStats.avg) }}</dd></div>
-        <div><dt class="text-muted-foreground">{{ t('live.peak') }}</dt><dd class="text-md font-semibold tabular">{{ watts(dayStats.peak[3]) }}</dd>
-          <dd class="text-caption">{{ t('live.at', { time: time(dayStats.peak[0]) }) }}</dd></div>
-        <div><dt class="text-muted-foreground">{{ t('live.lowest') }}</dt><dd class="text-md font-semibold tabular">{{ watts(dayStats.low[1]) }}</dd>
-          <dd class="text-caption">{{ t('live.at', { time: time(dayStats.low[0]) }) }}</dd></div>
+      <dl v-if="dayStats" class="mb-5 grid grid-cols-2 gap-x-8 gap-y-3 text-sm sm:flex sm:gap-0 sm:divide-x sm:divide-border">
+        <div class="sm:px-6 sm:first:pl-0"><dt class="text-xs text-caption">{{ t('live.measured') }}</dt><dd class="mt-1 font-semibold tabular">{{ num(dayStats.wh / 1000, 2) }}{{ NBSP }}kWh</dd>
+          <dd class="text-xs text-caption">{{ dayStats.minutes }} min<template v-if="price != null">, {{ money(dayStats.wh / 1000 * price) }}</template></dd></div>
+        <div class="sm:px-6"><dt class="text-xs text-caption">{{ t('live.avg') }}</dt><dd class="mt-1 font-semibold tabular">{{ watts(dayStats.avg) }}</dd></div>
+        <div class="sm:px-6"><dt class="text-xs text-caption">{{ t('live.peak') }}</dt><dd class="mt-1 font-semibold tabular">{{ watts(dayStats.peak[3]) }}</dd>
+          <dd class="text-xs text-caption">{{ t('live.at', { time: time(dayStats.peak[0]) }) }}</dd></div>
+        <div class="sm:pl-6"><dt class="text-xs text-caption">{{ t('live.lowest') }}</dt><dd class="mt-1 font-semibold tabular">{{ watts(dayStats.low[1]) }}</dd>
+          <dd class="text-xs text-caption">{{ t('live.at', { time: time(dayStats.low[0]) }) }}</dd></div>
       </dl>
       <p v-if="dayQ.isSuccess.value && !dayStats" class="py-8 text-center text-sm text-muted-foreground">{{ t('live.noDay') }}</p>
-      <EChart v-else-if="dayStats" :option="dayOption" :height="260" :label="t('live.day', { day: dayLabel })" />
-      <div v-else class="h-[260px] animate-pulse rounded-md bg-muted" />
-    </Panel>
+      <EChart v-else-if="dayStats" :option="dayOption" :height="240" :label="t('live.day', { day: dayLabel })" />
+      <div v-else class="h-[240px] animate-pulse rounded-md bg-muted" />
+    </Section>
   </div>
 </template>

@@ -66,7 +66,7 @@ export default {
     soFar: 'so far',
     tariffHint: 'Add a tariff under Costs',
   },
-  live: {
+  live: { windowLabel: 'Window', devices: 'Devices', devicesSub: 'sorted by power every 10 s', last5: 'Last 5 min', resting: 'Idle ({n}):',
     title: 'Live',
     connected: 'Live, every {s} s',
     connecting: 'Connecting…',

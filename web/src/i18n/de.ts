@@ -66,7 +66,7 @@ export default {
     soFar: 'bisher',
     tariffHint: 'Tarif in den Kosten hinterlegen',
   },
-  live: {
+  live: { windowLabel: 'Zeitfenster', devices: 'Geräte', devicesSub: 'alle 10 s nach Leistung sortiert', last5: 'Letzte 5 min', resting: 'Ohne Last ({n}):',
     title: 'Live',
     connected: 'Live, alle {s} s',
     connecting: 'Verbindet…',
