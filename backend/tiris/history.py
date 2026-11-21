@@ -42,6 +42,12 @@ def is_auth_error(exc: BaseException) -> bool:
     return any(m in msg for m in AUTH_ERROR_MARKERS)
 
 
+def is_session_error(exc: BaseException) -> bool:
+    """The plug dropped our session (e.g. after a login from another client); refresh_session() renews it."""
+    msg = str(exc)
+    return "SESSION_TIMEOUT" in msg or "Unauthorized" in msg
+
+
 def utcnow() -> datetime:
     return datetime.now(UTC)
 
@@ -342,6 +348,11 @@ async def fetch_with_retry(t: EnergyTarget, backfill: bool, first_known: dict | 
         except Exception as exc:
             if is_auth_error(exc) or attempt == attempts:
                 raise
+            if is_session_error(exc):   # another client logged in; renew this session instead of failing
+                try:
+                    await t.handler.refresh_session()
+                except Exception as rexc:
+                    log.warning("%s: session refresh failed: %s", t.label, rexc)
             log.warning("%s: Versuch %d fehlgeschlagen (%s), neuer Versuch in %.0fs", t.label, attempt, exc, delay_s)
             await asyncio.sleep(delay_s)
     raise RuntimeError("unreachable")

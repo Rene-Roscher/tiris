@@ -99,6 +99,11 @@ async def collect(db: ConnectionPool, plugs: PlugPool, force_backfill: bool = Fa
         if did not in outcome.parents:
             errors.append(f"Known plug not reachable: {nick or did} (last seen at {ip})")
 
+    # Share one session per plug: hand the freshly logged-in handlers to the pool before anything else
+    # uses them, so the live poller does not log in again and evict the collector's session.
+    for res in outcome.parents.values():
+        plugs.adopt(res.address[0], res.handler)
+
     targets: list[EnergyTarget] = []
     for res in outcome.parents.values():
         try:
@@ -111,8 +116,6 @@ async def collect(db: ConnectionPool, plugs: PlugPool, force_backfill: bool = Fa
 
     ok = failed = 0
     for t in targets:
-        if t.ip and t.parent_id is None:
-            plugs.adopt(t.ip, t.handler)
         backfill = force_backfill or t.device_id not in firsts
         try:
             data = await history.fetch_with_retry(t, backfill, firsts.get(t.device_id))

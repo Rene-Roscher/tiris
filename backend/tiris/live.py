@@ -16,6 +16,7 @@ from datetime import UTC, datetime
 
 from psycopg_pool import ConnectionPool
 
+from .history import is_session_error
 from .plugs import PlugPool
 
 log = logging.getLogger("tiris.live")
@@ -120,6 +121,12 @@ class LivePoller:
             if did not in self.errors:
                 log.info("%s (%s): %s", did[-6:], ip, exc)
             self.errors[did] = str(exc)[:200]
+            if is_session_error(exc):
+                try:   # renew the shared session instead of a new login that would evict other users of it
+                    await asyncio.wait_for((await self.plugs.handler(ip)).refresh_session(), 8)
+                    return None
+                except Exception:
+                    pass
             self.plugs.forget(ip)
             return None
 

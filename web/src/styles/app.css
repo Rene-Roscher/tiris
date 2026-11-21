@@ -1,0 +1,191 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "@fontsource-variable/geist" layer(base);
+@import "@fontsource-variable/geist-mono" layer(base);
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+/*
+  Design tokens. One token per role and theme; no role is derived from another role (design-quality).
+  Contrast (WCAG 2.2, computed 2026-11-21):
+    light  fg 17.7, fg-muted 7.7, caption 5.05 (4.59 on muted), link 5.8, good 5.4, warn 5.9, bad 5.6,
+           primary-fg on primary 5.8, input border 3.4
+    dark   fg 16.1, fg-muted 7.8, caption 5.7, link 7.6, good 8.7, warn 9.3, bad 6.8,
+           primary-fg on primary 4.65, input border 3.2
+  Chart slots: validated categorical palette (dataviz validator, adjacent CVD >= 8.4, both themes).
+*/
+:root {
+  color-scheme: light;
+  --background: #fafafa;          /* page */
+  --card: #ffffff;                /* raised surface */
+  --popover: #ffffff;
+  --muted: #f4f4f5;               /* subtle surface, hover */
+  --accent: #f4f4f5;              /* shadcn: hover surface (not the brand colour) */
+  --active: #ebebed;              /* pressed / selected surface */
+  --border: #e4e4e7;
+  --border-strong: #d4d4d8;
+  --input: #8b8b94;               /* input boundary, >= 3:1 */
+  --foreground: #18181b;
+  --card-foreground: #18181b;
+  --popover-foreground: #18181b;
+  --accent-foreground: #18181b;
+  --muted-foreground: #52525b;    /* secondary text */
+  --caption: #6e6e77;             /* tertiary text */
+  --primary: #1d5fd3;             /* the one accent: primary actions, links, focus, selection */
+  --primary-foreground: #ffffff;
+  --link: #1d5fd3;
+  --selection: #e8f0fd;
+  --secondary: #f4f4f5;
+  --secondary-foreground: #18181b;
+  --ring: #1d5fd3;
+  --destructive: #c42b2b;
+  --good: #16794a;
+  --warn: #9a5200;
+  --bad: #c42b2b;
+  --good-fill: #1f9d5c;
+  --warn-fill: #e89a1a;
+  --bad-fill: #e5484d;
+  --chart-1: #2a78d6;
+  --chart-2: #eb6834;
+  --chart-3: #1baf7a;
+  --chart-4: #eda100;
+  --chart-5: #e87ba4;
+  --chart-6: #008300;
+  --chart-other: #a8a8b0;
+  --chart-grid: #ececee;
+  --chart-axis: #d4d4d8;
+  --seq-1: #cde2fb; --seq-2: #9ec5f4; --seq-3: #6da7ec; --seq-4: #3987e5; --seq-5: #256abf; --seq-6: #184f95; --seq-7: #0d366b;
+  --shadow-float: 0 0 0 1px rgb(0 0 0 / 0.06), 0 8px 24px -6px rgb(0 0 0 / 0.14);
+}
+
+.dark {
+  color-scheme: dark;
+  --background: #0a0a0b;
+  --card: #111113;
+  --popover: #141416;
+  --muted: #1a1a1d;
+  --accent: #1a1a1d;
+  --active: #232327;
+  --border: #27272b;
+  --border-strong: #36363c;
+  --input: #64646e;
+  --foreground: #ededef;
+  --card-foreground: #ededef;
+  --popover-foreground: #ededef;
+  --accent-foreground: #ededef;
+  --muted-foreground: #a6a6b0;
+  --caption: #8d8d97;
+  --primary: #2f6fe4;
+  --primary-foreground: #ffffff;
+  --link: #6ea4ff;
+  --selection: #14233f;
+  --secondary: #1a1a1d;
+  --secondary-foreground: #ededef;
+  --ring: #6ea4ff;
+  --destructive: #e5484d;
+  --good: #4cc584;
+  --warn: #f0a83c;
+  --bad: #ff6b6b;
+  --good-fill: #2fb36b;
+  --warn-fill: #e8a030;
+  --bad-fill: #e5484d;
+  --chart-1: #3987e5;
+  --chart-2: #d95926;
+  --chart-3: #199e70;
+  --chart-4: #c98500;
+  --chart-5: #d55181;
+  --chart-6: #0ca30c;
+  --chart-other: #5f5f68;
+  --chart-grid: #1f1f23;
+  --chart-axis: #36363c;
+  --seq-1: #13233d; --seq-2: #184f95; --seq-3: #1c5cab; --seq-4: #256abf; --seq-5: #3987e5; --seq-6: #6da7ec; --seq-7: #b7d3f6;
+  --shadow-float: 0 0 0 1px rgb(255 255 255 / 0.07), 0 10px 30px -8px rgb(0 0 0 / 0.6);
+}
+
+@theme inline {
+  --font-sans: "Geist Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "Geist Mono Variable", ui-monospace, monospace;
+
+  /* Type scale: size / line height. Most app text is 14 px; 13 and 12 for dense secondary text. */
+  --text-xs: 12px;   --text-xs--line-height: 16px;
+  --text-sm: 13px;   --text-sm--line-height: 18px;
+  --text-base: 14px; --text-base--line-height: 20px;
+  --text-md: 16px;   --text-md--line-height: 24px;
+  --text-lg: 20px;   --text-lg--line-height: 26px;   --text-lg--letter-spacing: -0.02em;
+  --text-2xl: 32px;  --text-2xl--line-height: 38px;  --text-2xl--letter-spacing: -0.04em;
+  --text-4xl: 48px;  --text-4xl--line-height: 52px;  --text-4xl--letter-spacing: -0.05em;
+
+  --radius-sm: 4px;
+  --radius-md: 6px;     /* controls */
+  --radius-lg: 12px;    /* cards, dialogs, menus */
+  --radius-xl: 16px;    /* sheets */
+
+  --shadow-float: var(--shadow-float);
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-active: var(--active);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-input: var(--input);
+  --color-caption: var(--caption);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-link: var(--link);
+  --color-selection: var(--selection);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-ring: var(--ring);
+  --color-destructive: var(--destructive);
+  --color-good: var(--good);
+  --color-warn: var(--warn);
+  --color-bad: var(--bad);
+  --color-good-fill: var(--good-fill);
+  --color-warn-fill: var(--warn-fill);
+  --color-bad-fill: var(--bad-fill);
+
+  /* Stacking scale, low to high (design-quality layer hierarchy). Use z-raised etc., never numbers. */
+  --z-index-raised: 10;
+  --z-index-sheet: 20;
+  --z-index-modal: 30;
+  --z-index-confirm: 40;
+  --z-index-popover: 50;
+  --z-index-toast: 60;
+  --z-index-tooltip: 70;
+}
+
+@utility z-raised { z-index: 10; }
+@utility z-sheet { z-index: 20; }
+@utility z-modal { z-index: 30; }
+@utility z-confirm { z-index: 40; }
+@utility z-popover { z-index: 50; }
+@utility z-toast { z-index: 60; }
+@utility z-tooltip { z-index: 70; }
+@utility tabular { font-variant-numeric: tabular-nums; }
+
+@layer base {
+  * { border-color: var(--border); }
+  html { background: var(--background); }
+  body {
+    background: var(--background);
+    color: var(--foreground);
+    font-family: var(--font-sans);
+    font-size: 14px;
+    line-height: 20px;
+    -webkit-font-smoothing: antialiased;
+    font-feature-settings: "ss01" 0;
+  }
+  ::selection { background: var(--selection); }
+  :focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+  @media (prefers-reduced-motion: reduce) {
+    *, ::before, ::after { transition-duration: 1ms !important; animation-duration: 1ms !important; }
+  }
+}
