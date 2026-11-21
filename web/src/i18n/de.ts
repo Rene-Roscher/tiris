@@ -163,7 +163,7 @@ export default {
     noData: 'Für diesen Zeitraum gibt es keine Messwerte.',
     cyclesNote: 'Über 2 Tage zählt tiris auf Minuten- oder 5-Minuten-Werten; kürzere Zyklen fallen dann weg.',
   },
-  costs: {
+  costs: { meter: 'Zähler',
     title: 'Kosten',
     meters: 'Zähler', addMeter: 'Zähler anlegen', meterName: 'Name', meterNumber: 'Zählernummer', unit: 'Einheit',
     kind: { electricity: 'Strom', gas: 'Gas' },
@@ -204,7 +204,7 @@ export default {
     addPayment: 'Zahlung hinzufügen', byYear: 'Nach Jahr', total: 'Gesamt', avgMonth: 'Ø pro Monat',
     bookings: '{n} Buchungen',
   },
-  settings: {
+  settings: { plugsOk: '{n} Plugs ok', plugsFailed: '{n} mit Fehler', rawDetails: 'Technische Details', run: { session: 'Sitzung abgelaufen bei {names}; beim nächsten Abruf neu verbunden.', discovery: 'Bei der Suche im Netz haben {names} nicht geantwortet oder die zweite Anmeldung abgelehnt, meist weil tiris schon verbunden ist. Messwerte sind davon nicht betroffen.', misdated: 'Ältere Tageswerte von {names} passen nicht zu den Monatswerten und wurden verworfen.', timeout: '{names} hat nicht rechtzeitig geantwortet.', unreachable: '{names} war nicht erreichbar.', other: '' },
     title: 'Einstellungen',
     appearance: 'Darstellung', collector: 'Datenabruf', collectNow: 'Jetzt abrufen', collecting: 'Ruft ab…',
     collected: 'Abruf fertig: {status}', runs: 'Letzte Abrufe', status: { ok: 'ok', partial: 'teilweise', failed: 'fehlgeschlagen' },

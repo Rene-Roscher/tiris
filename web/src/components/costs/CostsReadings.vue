@@ -65,7 +65,7 @@ const remove = (day: string) => run(() => api.del(`/api/meters/${id}/readings/${
       <div class="grid gap-1.5"><Label :for="`rd-val-${id}`">{{ t('costs.readingValue') }} ({{ unit }})</Label>
         <Input :id="`rd-val-${id}`" v-model="f.value" inputmode="decimal" required class="w-36 text-right tabular" placeholder="12.840…" /></div>
       <div class="flex h-9 items-center gap-2"><Switch :id="`rd-est-${id}`" v-model="f.estimated" /><Label :for="`rd-est-${id}`">{{ t('costs.readingEstimated') }}</Label></div>
-      <Button type="submit" :disabled="busy">{{ t('costs.addReading') }}</Button>
+      <Button type="submit" variant="outline" :disabled="busy">{{ t('costs.addReading') }}</Button>
     </form>
   </Panel>
 </template>

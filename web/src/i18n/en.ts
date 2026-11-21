@@ -163,7 +163,7 @@ export default {
     noData: 'No measurements for this period.',
     cyclesNote: 'Over 2 days tiris counts on minute or 5-minute values; shorter cycles are missed then.',
   },
-  costs: {
+  costs: { meter: 'Meter',
     title: 'Costs',
     meters: 'Meters', addMeter: 'Add meter', meterName: 'Name', meterNumber: 'Meter number', unit: 'Unit',
     kind: { electricity: 'Electricity', gas: 'Gas' },
@@ -204,7 +204,7 @@ export default {
     addPayment: 'Add payment', byYear: 'By year', total: 'Total', avgMonth: 'Average per month',
     bookings: '{n} payments',
   },
-  settings: {
+  settings: { plugsOk: '{n} plugs ok', plugsFailed: '{n} failed', rawDetails: 'Technical details', run: { session: 'Session expired for {names}; reconnected on the next fetch.', discovery: 'During the network search {names} did not answer or refused a second login, usually because tiris is already connected. Readings are not affected.', misdated: 'Older daily values from {names} do not match the monthly values and were dropped.', timeout: '{names} did not answer in time.', unreachable: '{names} was not reachable.', other: '' },
     title: 'Settings',
     appearance: 'Appearance', collector: 'Data fetch', collectNow: 'Fetch now', collecting: 'Fetching…',
     collected: 'Fetch finished: {status}', runs: 'Recent fetches', status: { ok: 'ok', partial: 'partial', failed: 'failed' },

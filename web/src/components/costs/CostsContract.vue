@@ -59,7 +59,7 @@ const delPlan = (pid: number) => run(() => api.del(`/api/plans/${pid}`), t('comm
       <div class="grid gap-1.5"><Label :for="`tf-prov-${id}`">{{ t('costs.provider') }}</Label><Input :id="`tf-prov-${id}`" v-model="tf.provider" maxlength="80" /></div>
       <div class="grid gap-1.5"><Label :for="`tf-end-${id}`">{{ t('costs.contractEnd') }}</Label><Input :id="`tf-end-${id}`" v-model="tf.contract_end" type="date" /></div>
       <div class="col-span-full flex flex-wrap items-center justify-end gap-3"><span class="text-sm text-caption tabular">{{ gross != null ? t('costs.gross', { value: `${num(gross, 2)} ct` }) : '' }}</span>
-        <Button type="submit" :disabled="busy">{{ t('costs.addTariff') }}</Button></div>
+        <Button type="submit" variant="outline" :disabled="busy">{{ t('costs.addTariff') }}</Button></div>
     </form>
 
     <div class="mt-6 border-t border-border pt-4">
@@ -77,7 +77,7 @@ const delPlan = (pid: number) => run(() => api.del(`/api/plans/${pid}`), t('comm
         <div class="grid gap-1.5"><Label :for="`pl-amt-${id}`">{{ t('costs.planAmount') }}</Label><Input :id="`pl-amt-${id}`" v-model="pf.amount_gross" inputmode="decimal" required class="w-28 tabular" placeholder="62,00…" /></div>
         <div class="grid gap-1.5"><Label :for="`pl-from-${id}`">{{ t('costs.firstDue') }}</Label><Input :id="`pl-from-${id}`" v-model="pf.valid_from" type="date" required class="w-40" /></div>
         <div class="grid gap-1.5"><Label :for="`pl-to-${id}`">{{ t('costs.lastDue') }}</Label><Input :id="`pl-to-${id}`" v-model="pf.valid_to" type="date" class="w-40" /></div>
-        <Button type="submit" :disabled="busy">{{ t('costs.addPlan') }}</Button>
+        <Button type="submit" variant="outline" :disabled="busy">{{ t('costs.addPlan') }}</Button>
       </form>
     </div>
   </Panel>

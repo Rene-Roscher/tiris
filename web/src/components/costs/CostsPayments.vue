@@ -41,7 +41,7 @@ const remove = (id: number) => run(() => api.del(`/api/payments/${id}`), t('comm
 <template>
   <Panel :title="t('costs.payments')" :description="t('costs.paymentsSub')">
     <template #actions>
-      <span v-if="unassigned" class="rounded-full bg-warn-fill px-2 py-px text-xs font-medium text-black">{{ t('costs.unassignedCount', { n: unassigned }) }}</span>
+      <span v-if="unassigned" class="flex items-center gap-1.5 text-sm font-medium text-warn"><span class="size-1.5 rounded-full bg-warn-fill" aria-hidden="true" />{{ t('costs.unassignedCount', { n: unassigned }) }}</span>
     </template>
     <div v-if="q.data.value?.by_year.length" class="overflow-x-auto">
       <table class="w-full min-w-[520px] text-sm">
@@ -109,7 +109,7 @@ const remove = (id: number) => run(() => api.del(`/api/payments/${id}`), t('comm
           <SelectContent><SelectItem v-for="m in meters" :key="m.id" :value="String(m.id)">{{ m.name }}</SelectItem>
             <SelectItem value="none">{{ t('costs.unassigned') }}</SelectItem></SelectContent></Select></div>
       <div class="grid gap-1.5"><Label for="pay-note">{{ t('common.note') }}</Label><Input id="pay-note" v-model="f.note" maxlength="200" class="w-48" /></div>
-      <Button type="submit" :disabled="busy">{{ t('costs.addPayment') }}</Button>
+      <Button type="submit" variant="outline" :disabled="busy">{{ t('costs.addPayment') }}</Button>
     </form>
   </Panel>
 </template>
