@@ -35,7 +35,7 @@ const items = computed(() => [
     <RouterLink
       v-for="i in items" :key="i.to" :to="i.to" @click="$emit('navigate')"
       :aria-current="isActive(i.to) ? 'page' : undefined"
-      class="flex h-8 items-center gap-2.5 rounded-md px-2 transition-[color,background-color] duration-150"
+      class="flex h-8 items-center gap-2.5 rounded-md px-2 transition-[color,background-color]"
       :class="isActive(i.to) ? 'bg-active font-medium text-foreground' : 'text-muted-foreground hover:bg-accent hover:text-foreground'"
     >
       <component :is="i.icon" class="size-4" aria-hidden="true" />

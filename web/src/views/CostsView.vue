@@ -111,7 +111,7 @@ const monthsOption = computed<EChartsOption>(() => {
     <StateMessage kind="setup" :title="t('costs.noMeterTitle')" :body="t('costs.noMeterBody')" :action="t('costs.addMeter')" @action="openDialog(null)" />
   </div>
 
-  <div v-else class="flex flex-col gap-4 transition-opacity duration-200" :class="q.isFetching.value && d ? 'opacity-60' : ''">
+  <div v-else class="flex flex-col gap-4 transition-opacity" :class="q.isFetching.value && d ? 'opacity-60' : ''">
     <StateMessage v-if="q.isError.value && !d" kind="error" :title="t('states.errorTitle')" :body="t('states.errorBody', { detail: q.error.value?.message ?? '' })"
                   :action="t('common.retry')" @action="q.refetch()" />
     <div v-else-if="!d" class="h-48 animate-pulse rounded-lg bg-muted" />

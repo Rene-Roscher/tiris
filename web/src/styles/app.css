@@ -117,6 +117,14 @@
   --text-2xl: 32px;  --text-2xl--line-height: 38px;  --text-2xl--letter-spacing: -0.04em;
   --text-4xl: 48px;  --text-4xl--line-height: 52px;  --text-4xl--letter-spacing: -0.05em;
 
+  /* Motion curves (interface-motion). Fallbacks here; lib/motion.ts swaps in springs generated as linear(). */
+  --ease-quick: cubic-bezier(0.23, 1, 0.32, 1);    /* hover, colour, press: 150 ms */
+  --ease-settle: cubic-bezier(0.2, 0, 0, 1);       /* spring 0.30 s, bounce 0: popovers, menus, sheet */
+  --ease-calm: cubic-bezier(0.2, 0, 0, 1);         /* spring 0.35 s, bounce 0: dialogs */
+  /* every transition-* utility without its own duration or easing reads the quick token */
+  --default-transition-duration: var(--ease-quick-ms);
+  --default-transition-timing-function: var(--ease-quick);
+
   --radius-sm: 4px;
   --radius-md: 6px;     /* controls */
   --radius-lg: 12px;    /* cards, dialogs, menus */
@@ -174,6 +182,11 @@
 @utility tabular { font-variant-numeric: tabular-nums; }
 
 @layer base {
+  :root {
+    --ease-quick-ms: 150ms;
+    --ease-settle-ms: 400ms;   /* settle time of the generated spring, not its perceptual duration */
+    --ease-calm-ms: 471ms;
+  }
   * { border-color: var(--border); }
   html { background: var(--background); }
   body {
@@ -190,4 +203,24 @@
   @media (prefers-reduced-motion: reduce) {
     *, ::before, ::after { transition-duration: 1ms !important; animation-duration: 1ms !important; }
   }
+}
+
+/*
+  Overlays that can be closed while they open (dialog, confirm, sheet) use transitions, which start from the value
+  on screen; keyframes would restart and jump. Reduced motion: the global rule in @layer base makes them instant.
+*/
+@layer components {
+  .t-fade-enter-active, .t-fade-leave-active { transition: opacity var(--ease-quick-ms) var(--ease-quick); }
+  .t-fade-enter-from, .t-fade-leave-to { opacity: 0; }
+
+  .t-dialog-enter-active, .t-dialog-leave-active {
+    transition: opacity var(--ease-calm-ms) var(--ease-calm), scale var(--ease-calm-ms) var(--ease-calm);
+  }
+  .t-dialog-enter-from, .t-dialog-leave-to { opacity: 0; scale: 0.96; }
+
+  .t-sheet-enter-active, .t-sheet-leave-active { transition: translate var(--ease-settle-ms) var(--ease-settle); }
+  .t-sheet-enter-from[data-side="left"], .t-sheet-leave-to[data-side="left"] { translate: -100% 0; }
+  .t-sheet-enter-from[data-side="right"], .t-sheet-leave-to[data-side="right"] { translate: 100% 0; }
+  .t-sheet-enter-from[data-side="top"], .t-sheet-leave-to[data-side="top"] { translate: 0 -100%; }
+  .t-sheet-enter-from[data-side="bottom"], .t-sheet-leave-to[data-side="bottom"] { translate: 0 100%; }
 }

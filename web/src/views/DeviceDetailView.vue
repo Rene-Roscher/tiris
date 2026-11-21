@@ -148,7 +148,7 @@ const dailyOption = computed<EChartsOption>(() => {
 
   <StateMessage v-if="a.isError.value && !d" kind="error" :title="t('states.errorTitle')" :body="t('states.errorBody', { detail: a.error.value?.message ?? '' })"
                 :action="t('common.retry')" @action="a.refetch()" />
-  <div v-else class="flex flex-col gap-4 transition-opacity duration-200" :class="a.isFetching.value && d ? 'opacity-60' : ''">
+  <div v-else class="flex flex-col gap-4 transition-opacity" :class="a.isFetching.value && d ? 'opacity-60' : ''">
     <section class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
       <KpiTile :label="t('detail.energy')" :value="kwh(d?.energy_wh)" unit="kWh" :loading="!d"
                :sub="price != null && d ? money(d.energy_wh / 1000 * price) : undefined" />

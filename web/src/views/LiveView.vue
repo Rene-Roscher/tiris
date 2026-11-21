@@ -196,7 +196,8 @@ const perHour = (w: number | null | undefined) => (w == null || price.value == n
         <p class="text-2xl font-semibold tabular" :class="c.st === 'idle' || c.st === 'offline' ? 'text-caption' : ''">{{ c.live ? watts(c.live.w) : '–' }}</p>
         <Sparkline :values="c.spark" :width="240" :height="32" class="w-full" />
         <div class="h-1 overflow-hidden rounded-full bg-muted" :aria-label="`${num(c.share * 100)} %`">
-          <div class="h-full rounded-full bg-primary transition-[width] duration-300" :style="{ width: `${(c.share * 100).toFixed(1)}%` }" />
+          <div class="h-full w-full origin-left rounded-full bg-primary transition-transform duration-(--ease-settle-ms) ease-settle"
+               :style="{ transform: `scaleX(${c.share.toFixed(3)})` }" />
         </div>
         <dl class="grid grid-cols-2 gap-x-3 gap-y-1 text-xs">
           <div class="flex justify-between gap-2"><dt class="text-caption">{{ t('live.current') }}</dt><dd class="tabular text-muted-foreground">{{ c.live ? `${num(c.live.a, 2)}${NBSP}A` : '–' }}</dd></div>

@@ -92,7 +92,7 @@ const mmss = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, 
           <button v-else type="button" class="group flex items-center gap-1.5 rounded-sm font-medium" :class="on || !reachable ? '' : 'text-muted-foreground'"
                   :title="t('devices.renameHint')" @click="startEdit">
             {{ d.name }}
-            <Pencil class="size-3.5 text-caption opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-visible:opacity-100" aria-hidden="true" />
+            <Pencil class="size-3.5 text-caption opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100" aria-hidden="true" />
           </button>
           <span v-if="d.protected" class="flex items-center gap-1 rounded-full bg-selection px-2 py-px text-xs font-medium">
             <Lock class="size-3" aria-hidden="true" />{{ t('devices.protected') }}

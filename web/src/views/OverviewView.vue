@@ -177,7 +177,7 @@ const rows = computed(() => {
                 :busy="q.isFetching.value" @action="q.refetch()" />
   <StateMessage v-else-if="q.isSuccess.value && !d?.devices.length" :title="t('states.noDataTitle')" :body="t('states.noDataBody')" />
 
-  <div v-else class="flex flex-col gap-4 transition-opacity duration-200" :class="q.isFetching.value && d ? 'opacity-60' : ''">
+  <div v-else class="flex flex-col gap-4 transition-opacity" :class="q.isFetching.value && d ? 'opacity-60' : ''">
     <!-- Hero: the one bold element of this view -->
     <section class="grid gap-6 rounded-lg border border-border bg-card p-6 lg:grid-cols-[1fr_1.4fr]">
       <div class="min-w-0">
@@ -266,7 +266,7 @@ const rows = computed(() => {
           </thead>
           <tbody>
             <tr v-for="x in rows" :key="x.id" tabindex="0"
-                class="cursor-pointer border-t border-border transition-[background-color] duration-150 hover:bg-accent focus-visible:outline-offset-[-2px]"
+                class="cursor-pointer border-t border-border transition-[background-color] hover:bg-accent focus-visible:outline-offset-[-2px]"
                 :class="device === x.id ? 'bg-selection hover:bg-selection' : ''" :aria-selected="device === x.id"
                 @click="setQuery({ device: device === x.id ? undefined : x.id })" @keydown.enter="setQuery({ device: device === x.id ? undefined : x.id })">
               <td class="max-w-56 truncate px-3 py-2.5 font-medium">

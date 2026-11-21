@@ -83,7 +83,7 @@ async function remove(r: ScheduleRule) {
         <Input :id="`${device.id}-off`" v-model="form.offset" type="number" min="-720" max="720" class="w-28 tabular" /></div>
       <div class="flex gap-1" role="group" :aria-label="t('devices.schedules.trigger')">
         <button v-for="n in ORDER" :key="n" type="button" :aria-pressed="form.days.includes(n)" @click="toggleDay(n)"
-                class="size-9 rounded-md border text-sm transition-[background-color,color,border-color] duration-150"
+                class="size-9 rounded-md border text-sm transition-[background-color,color,border-color]"
                 :class="form.days.includes(n) ? 'border-transparent bg-primary font-medium text-primary-foreground' : 'border-border bg-card text-muted-foreground hover:bg-accent'">
           {{ dayName(n) }}
         </button>
