@@ -1,23 +1,25 @@
 <script setup lang="ts">
+/*
+  Overview (Linear-calm): a hero row with the three answers (now, month so far, where the month lands),
+  then sections separated by hairlines. Charts in one neutral tone; only today is in the accent.
+*/
 import { useQuery } from '@tanstack/vue-query'
 import type { EChartsOption } from 'echarts'
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import EChart from '@/components/charts/EChart.vue'
+import LiveSpark from '@/components/charts/LiveSpark.vue'
 import Sparkline from '@/components/charts/Sparkline.vue'
-import KpiTile from '@/components/KpiTile.vue'
-import PageHeader from '@/components/PageHeader.vue'
-import Panel from '@/components/Panel.vue'
+import Section from '@/components/Section.vue'
+import Segmented from '@/components/Segmented.vue'
 import StateMessage from '@/components/StateMessage.vue'
-import { Button } from '@/components/ui/button'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useChartTheme } from '@/composables/useChartTheme'
 import { useLive } from '@/composables/useLive'
 import { ApiError, api } from '@/lib/api'
+import { mix } from '@/lib/charts'
 import { dayLong, dayShort, eurFromWh, kwh, money, monthLong, monthShort, NBSP, num, pct, watts } from '@/lib/format'
-import type { Overview } from '@/lib/types'
+import type { Device, Overview } from '@/lib/types'
 
 const { t } = useI18n()
 const route = useRoute()
@@ -26,149 +28,162 @@ const theme = useChartTheme()
 const live = useLive()
 
 const RANGES = [7, 30, 90, 400] as const
-const days = computed(() => { const d = Number(route.query.days); return RANGES.includes(d as never) ? d : 30 })
-const device = computed(() => (typeof route.query.device === 'string' ? route.query.device : null))
-const setQuery = (q: Record<string, string | undefined>) => router.replace({ query: { ...route.query, ...q } })
+const days = computed<number>({
+  get: () => { const d = Number(route.query.days); return RANGES.includes(d as never) ? d : 30 },
+  set: (v) => router.replace({ query: { ...route.query, days: v === 30 ? undefined : String(v) } }),
+})
+const rangeOptions = computed(() => [
+  { value: 7, label: t('overview.range.d7') }, { value: 30, label: t('overview.range.d30') },
+  { value: 90, label: t('overview.range.d90') }, { value: 400, label: t('overview.range.all') },
+])
 
 const q = useQuery({
-  queryKey: computed(() => ['overview', days.value, device.value]),
-  queryFn: () => api.get<Overview>(`/api/overview?days=${days.value}${device.value ? `&device=${encodeURIComponent(device.value)}` : ''}`),
+  queryKey: computed(() => ['overview', days.value, null]),
+  queryFn: () => api.get<Overview>(`/api/overview?days=${days.value}`),
   placeholderData: (prev) => prev,
   refetchInterval: 5 * 60_000,
 })
+const devs = useQuery({ queryKey: ['devices'], queryFn: () => api.get<{ devices: Device[] }>('/api/devices'), staleTime: 30_000 })
+const health = useQuery({ queryKey: ['health'], queryFn: () => api.get<{ tapo: boolean }>('/api/health'), staleTime: 60_000 })
 const d = computed(() => q.data.value)
 // 503 = no data yet (or no Tapo account): an empty state, not an error
-const health = useQuery({ queryKey: ['health'], queryFn: () => api.get<{ tapo: boolean }>('/api/health'), staleTime: 60_000 })
 const empty = computed(() => q.error.value instanceof ApiError && q.error.value.status === 503)
 const k = computed(() => d.value?.kpi)
 const price = computed(() => d.value?.price ?? null)
-const devById = computed(() => Object.fromEntries((d.value?.devices ?? []).map((x) => [x.id, x])))
-const selName = computed(() => (device.value ? devById.value[device.value]?.name : null))
+const meta = computed(() => Object.fromEntries((devs.data.value?.devices ?? []).map((x) => [x.id, x])))
+const names = computed(() => Object.fromEntries((d.value?.devices ?? []).map((x) => [x.id, x.name])))
 const ratio = (a?: number | null, b?: number | null) => (a == null || !b ? null : a / b - 1)
 
-const nowLabel = computed(() => new Intl.DateTimeFormat(undefined, { month: 'long' }).format(d.value ? new Date(d.value.now) : new Date()))
-const monthProgress = computed(() => (k.value?.forecast_month_wh ? Math.min(1, k.value.mtd_wh / k.value.forecast_month_wh) : 0))
-const avgDay = computed(() => (k.value?.range_wh ?? 0) / Math.max(1, d.value?.range.days ?? 1))
-
-const livePower = computed(() => {
-  const devs = live.snapshot.value?.devices ?? {}
-  const ids = device.value ? [device.value] : Object.keys(devs)
-  const vals = ids.map((id) => devs[id]?.w).filter((v): v is number => v != null)
-  return { w: vals.length ? vals.reduce((a, b) => a + b, 0) : null, n: vals.length, of: live.snapshot.value?.known ?? ids.length }
+const month = computed(() => new Intl.DateTimeFormat(undefined, { month: 'long' }).format(d.value ? new Date(d.value.now) : new Date()))
+const prevMonth = computed(() => {
+  const n = d.value ? new Date(d.value.now) : new Date()
+  return new Intl.DateTimeFormat(undefined, { month: 'long' }).format(new Date(n.getFullYear(), n.getMonth() - 1, 1))
 })
+const monthDelta = computed(() => ratio(k.value?.mtd_complete_wh, k.value?.prev_month_same_wh))
+const monthProgress = computed(() => (k.value?.forecast_month_wh ? Math.min(1, k.value.mtd_wh / k.value.forecast_month_wh) : 0))
 
-const series = computed(() => (d.value?.series_keys ?? []).map((key) => {
-  if (key === 'other') return { key, label: device.value ? selName.value ?? '' : t('overview.other'), slot: device.value ? 1 : 0 }
-  const dev = devById.value[key]
-  return { key, label: dev?.name ?? key, slot: dev?.slot ?? 0 }
-}))
+const nowW = computed(() => live.snapshot.value?.total_w ?? null)
+const liveW = (id: string) => live.snapshot.value?.devices[id]?.w ?? null
 
+/* daily: one tone, today in the accent, average dashed; the tooltip names the devices */
 const dailyOption = computed<EChartsOption>(() => {
-  const th = theme.value, rows = d.value?.daily ?? []
-  const peak = d.value?.kpi.peak_day?.day
+  const th = theme.value, rows = d.value?.daily ?? [], last = rows.length - 1
+  const done = rows.slice(0, -1), avg = done.reduce((s, r) => s + r.total, 0) / Math.max(1, done.length) / 1000
+  const caption = th.token('caption')
   return {
     ...th.base,
-    tooltip: { ...th.base.tooltip, trigger: 'axis', axisPointer: { type: 'shadow', shadowStyle: { color: th.token('muted') } },
-      valueFormatter: (v) => `${kwh(Number(v) * 1000)}${NBSP}kWh` },
-    xAxis: { type: 'category', data: rows.map((r) => r.day), axisTick: { show: false }, axisLine: th.base.axisCommon.axisLine,
-      axisLabel: { ...th.base.axisCommon.axisLabel, formatter: (v: string) => dayShort(v), hideOverlap: true } },
-    yAxis: { type: 'value', splitLine: th.base.axisCommon.splitLine, axisLabel: { ...th.base.axisCommon.axisLabel, formatter: (v: number) => num(v) },
-      name: 'kWh', nameGap: 12, nameTextStyle: { color: th.token('caption'), align: 'left' } },
-    grid: { ...th.base.grid, top: 28 },
-    series: series.value.map((s, i) => ({
-      type: 'bar', stack: 'total', name: s.label, barMaxWidth: 22,
-      itemStyle: { color: th.slotColor(s.slot), borderColor: th.token('card'), borderWidth: rows.length > 60 ? 0 : 1,
-        borderRadius: i === series.value.length - 1 ? [4, 4, 0, 0] : 0 },
-      emphasis: { focus: 'series' },
-      data: rows.map((r) => +((r.by[s.key] ?? 0) / 1000).toFixed(3)),
-      ...(i === series.value.length - 1 && peak ? {
-        markPoint: undefined,
-        label: { show: true, position: 'top', color: th.token('foreground'), fontWeight: 600, fontSize: 11,
-          formatter: (p: { dataIndex: number }) => (rows[p.dataIndex]?.day === peak && rows.length <= 120 ? kwh(rows[p.dataIndex]!.total) : '') },
-      } : {}),
-    })),
+    grid: { left: 0, right: 0, top: 8, bottom: 0, containLabel: true },
+    tooltip: { ...th.base.tooltip, trigger: 'axis', axisPointer: { type: 'none' },
+      formatter: (ps: unknown) => {
+        const i = (ps as { dataIndex: number }[])[0]!.dataIndex, r = rows[i]!
+        const parts = Object.entries(r.by).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]).slice(0, 4)
+        const line = (a: string, b: string) => `<div style="display:flex;justify-content:space-between;gap:16px"><span>${a}</span><b style="font-weight:500">${b}</b></div>`
+        return `<div style="min-width:190px"><div style="display:flex;justify-content:space-between;gap:16px;margin-bottom:4px;font-weight:600"><span>${dayLong(r.day)}</span><span>${kwh(r.total, 2)}${NBSP}kWh</span></div>` +
+          parts.map(([id, v]) => line(id === 'other' ? t('overview.other') : names.value[id] ?? id.slice(0, 6), kwh(v, 2))).join('') +
+          (price.value != null ? `<div style="margin-top:4px">${line(t('overview.cost'), eurFromWh(r.total, price.value))}</div>` : '') + '</div>'
+      } },
+    xAxis: { type: 'category', data: rows.map((r) => r.day), axisTick: { show: false }, axisLine: { show: false },
+      axisLabel: { color: caption, fontSize: 11, hideOverlap: true, formatter: (v: string, i: number) => (i === last ? t('overview.todayShort') : dayShort(v)) } },
+    yAxis: { type: 'value', position: 'right', splitNumber: 3, splitLine: th.base.axisCommon.splitLine,
+      axisLabel: { color: caption, fontSize: 11, formatter: (v: number) => `${num(v)}${NBSP}kWh` } },
+    series: [{
+      type: 'bar', barMaxWidth: 22, barCategoryGap: '38%',
+      data: rows.map((r, i) => ({ value: +(r.total / 1000).toFixed(3), itemStyle: { color: th.token(i === last ? 'primary' : 'bar'), borderRadius: [2, 2, 0, 0] } })),
+      emphasis: { itemStyle: { color: th.token('bar-hover') } },
+      markLine: { silent: true, symbol: 'none', lineStyle: { color: caption, type: [3, 3], width: 1 },
+        label: { position: 'insideEndTop', color: th.token('muted-foreground'), fontSize: 11, formatter: `Ø ${num(avg, 1)}` },
+        data: [{ yAxis: +avg.toFixed(2) }] },
+    }],
   }
 })
+const dailySummary = computed(() => {
+  if (!k.value || !d.value) return ''
+  const parts = [`${kwh(k.value.range_wh, 0)}${NBSP}kWh`]
+  if (price.value != null) parts[0] += `, ${eurFromWh(k.value.range_wh, price.value)}`
+  if (k.value.peak_day) parts.push(t('overview.peak', { day: dayLong(k.value.peak_day.day), value: kwh(k.value.peak_day.total) }))
+  return parts.join(' · ')
+})
 
+/* months: one tone, the running month lighter with its forecast outlined */
 const monthsOption = computed<EChartsOption>(() => {
-  const th = theme.value, ms = d.value?.months ?? [], fc = k.value?.forecast_month_wh ?? 0
+  const th = theme.value, ms = d.value?.months ?? [], fc = k.value?.forecast_month_wh ?? 0, caption = th.token('caption')
   return {
     ...th.base,
-    tooltip: { ...th.base.tooltip, trigger: 'axis', axisPointer: { type: 'shadow', shadowStyle: { color: th.token('muted') } },
+    grid: { left: 0, right: 0, top: 8, bottom: 0, containLabel: true },
+    tooltip: { ...th.base.tooltip, trigger: 'axis', axisPointer: { type: 'none' },
       formatter: (ps: unknown) => {
-        const p = (ps as { dataIndex: number }[])[0]!, m = ms[p.dataIndex]!
+        const m = ms[(ps as { dataIndex: number }[])[0]!.dataIndex]!
         const lines = [`<b>${monthLong(m.month)}</b>`, `${kwh(m.wh)}${NBSP}kWh${m.partial ? ` (${t('overview.soFar')})` : ''}`]
         if (price.value != null) lines.push(eurFromWh(m.wh, price.value))
         if (m.partial && fc) lines.push(`${t('overview.forecast')}: ${kwh(fc, 0)}${NBSP}kWh`)
         return lines.join('<br>')
       } },
-    xAxis: { type: 'category', data: ms.map((m) => m.month), axisTick: { show: false }, axisLine: th.base.axisCommon.axisLine,
-      axisLabel: { ...th.base.axisCommon.axisLabel, formatter: (v: string) => monthShort(v) } },
-    yAxis: { type: 'value', splitLine: th.base.axisCommon.splitLine, axisLabel: { ...th.base.axisCommon.axisLabel, formatter: (v: number) => num(v) },
-      name: 'kWh', nameGap: 12, nameTextStyle: { color: th.token('caption'), align: 'left' } },
-    grid: { ...th.base.grid, top: 28 },
+    xAxis: { type: 'category', data: ms.map((m) => m.month), axisTick: { show: false }, axisLine: { show: false },
+      axisLabel: { color: caption, fontSize: 11, formatter: (v: string) => monthShort(v) } },
+    yAxis: { type: 'value', position: 'right', splitNumber: 3, splitLine: th.base.axisCommon.splitLine, axisLabel: { color: caption, fontSize: 11, formatter: (v: number) => num(v) } },
     series: [
       { type: 'bar', barGap: '-100%', barMaxWidth: 22, silent: true, z: 1,
-        itemStyle: { color: 'transparent', borderColor: th.token('primary'), borderWidth: 1, borderType: 'solid', borderRadius: [4, 4, 0, 0] },
+        itemStyle: { color: 'transparent', borderColor: th.token('border-strong'), borderWidth: 1, borderType: [3, 2], borderRadius: [2, 2, 0, 0] },
         data: ms.map((m) => (m.partial && fc > m.wh ? +(fc / 1000).toFixed(1) : null)) },
-      { type: 'bar', barMaxWidth: 22, z: 2,
-        itemStyle: { borderRadius: [4, 4, 0, 0] },
-        data: ms.map((m) => ({ value: +(m.wh / 1000).toFixed(1), itemStyle: { color: th.token('chart-1'), opacity: m.partial ? 0.5 : 1 } })) },
+      { type: 'bar', barMaxWidth: 22, z: 2, emphasis: { itemStyle: { color: th.token('bar-hover') } },
+        data: ms.map((m) => ({ value: +(m.wh / 1000).toFixed(1), itemStyle: { color: th.token('bar'), opacity: m.partial ? 0.6 : 1, borderRadius: [2, 2, 0, 0] } })) },
     ],
   }
 })
+const monthsSummary = computed(() => {
+  const full = (d.value?.months ?? []).filter((m) => !m.partial).slice(-12)
+  if (!full.length) return ''
+  const sum = full.reduce((s, m) => s + m.wh, 0)
+  return t('overview.last12', { kwh: kwh(sum, 0), eur: price.value != null ? `, ${money(sum / 1000 * price.value, 0)}` : '' })
+})
 
+/* when: one hue from the empty surface to the accent, scaled to the 95th percentile */
 const heatOption = computed<EChartsOption>(() => {
   const th = theme.value, cells = d.value?.heat ?? []
   const dows = new Intl.DateTimeFormat(undefined, { weekday: 'short' })
   const dayNames = [1, 2, 3, 4, 5, 6, 7].map((i) => dows.format(new Date(2024, 0, i)))   // 2024-01-01 is a Monday
   const sorted = cells.map((c) => c.wh).sort((a, b) => a - b)
-  // Scale to the 95th percentile, so one outlier hour does not wash out every other cell
   const max = Math.max(1, sorted[Math.floor(sorted.length * 0.95)] ?? 1)
+  const from = th.token('heat-0'), to = th.token('primary'), caption = th.token('caption')
   return {
     ...th.base,
-    grid: { left: 4, right: 4, top: 4, bottom: 28, containLabel: true },
+    grid: { left: 0, right: 0, top: 0, bottom: 24, containLabel: true },
     tooltip: { ...th.base.tooltip, formatter: (p: unknown) => {
-      const v = (p as { value: [number, number, number, number] }).value
-      return `<b>${dayNames[v[1]]} ${String(v[0]).padStart(2, '0')}–${String(v[0] + 1).padStart(2, '0')}</b><br>${num(v[2])}${NBSP}Wh`
+      const v = (p as { value: [number, number, number] }).value
+      return `<b>${dayNames[v[1]]} ${String(v[0]).padStart(2, '0')}–${String(v[0] + 1).padStart(2, '0')}</b><br>Ø ${num(v[2])}${NBSP}Wh`
     } },
-    xAxis: { type: 'category', data: Array.from({ length: 24 }, (_, i) => i), splitArea: { show: false }, axisTick: { show: false },
-      axisLine: { show: false }, axisLabel: { ...th.base.axisCommon.axisLabel, interval: 5 } },
-    yAxis: { type: 'category', data: dayNames, inverse: true, axisTick: { show: false }, axisLine: { show: false }, axisLabel: th.base.axisCommon.axisLabel },
-    visualMap: { dimension: 2, min: 0, max, calculable: false, orient: 'horizontal', left: 'center', bottom: 0, itemHeight: 120, itemWidth: 8,
-      text: [`≥${NBSP}${num(max)}${NBSP}Wh`, '0'], textStyle: { color: th.token('caption'), fontSize: 11 },
-      inRange: { color: [1, 2, 3, 4, 5, 6, 7].map((i) => th.token(`seq-${i}`)) } },
-    series: [{ type: 'heatmap', itemStyle: { borderColor: th.token('card'), borderWidth: 2, borderRadius: 3 },
-      data: cells.map((c) => [c.hour, c.dow - 1, Math.round(c.wh), c.n]) }],
+    xAxis: { type: 'category', data: Array.from({ length: 24 }, (_, i) => i), axisTick: { show: false }, axisLine: { show: false },
+      axisLabel: { color: caption, fontSize: 11, interval: 5 } },
+    yAxis: { type: 'category', data: dayNames, inverse: true, axisTick: { show: false }, axisLine: { show: false }, axisLabel: { color: caption, fontSize: 11 } },
+    visualMap: { show: false, dimension: 2, min: 0, max, inRange: { color: [0, 0.25, 0.5, 0.75, 1].map((s) => mix(from, to, s * 0.85)) } },
+    series: [{ type: 'heatmap', itemStyle: { borderColor: th.token('background'), borderWidth: 2, borderRadius: 2 },
+      data: cells.map((c) => [c.hour, c.dow - 1, Math.round(c.wh / Math.max(1, c.n))]) }],
   }
 })
 
+/* devices: sorted by what draws now, then by energy in the range */
 const rows = computed(() => {
-  const list = [...(d.value?.devices ?? [])].sort((a, b) => b.range_wh - a.range_wh)
+  const list = d.value?.devices ?? []
   const total = list.reduce((s, x) => s + x.range_wh, 0)
-  const max = Math.max(1, ...list.map((x) => x.range_wh))
-  return list.map((x) => ({ ...x, share: total ? x.range_wh / total : 0, bar: x.range_wh / max }))
+  const maxW = Math.max(1, ...list.map((x) => liveW(x.id) ?? 0))
+  return [...list]
+    .map((x) => {
+      const w = liveW(x.id), m = meta.value[x.id]
+      return { ...x, w, on: m?.status?.device_on !== false, room: m?.room ?? null, share: total ? x.range_wh / total : 0, bar: (w ?? 0) / maxW }
+    })
+    .sort((a, b) => Number(b.on) - Number(a.on) || (b.w ?? -1) - (a.w ?? -1) || b.range_wh - a.range_wh)
 })
+const totals = computed(() => ({
+  w: nowW.value, today: k.value?.today_wh ?? 0, range: rows.value.reduce((s, x) => s + x.range_wh, 0),
+}))
+const open = (id: string) => router.push(`/devices/${id}`)
 </script>
 
 <template>
-  <PageHeader :title="t('overview.title')">
-    <Tabs v-if="!empty" :model-value="String(days)" @update:model-value="(v) => setQuery({ days: String(v) })">
-      <TabsList>
-        <TabsTrigger value="7">{{ t('overview.range.d7') }}</TabsTrigger>
-        <TabsTrigger value="30">{{ t('overview.range.d30') }}</TabsTrigger>
-        <TabsTrigger value="90">{{ t('overview.range.d90') }}</TabsTrigger>
-        <TabsTrigger value="400">{{ t('overview.range.all') }}</TabsTrigger>
-      </TabsList>
-    </Tabs>
-    <Select v-if="!empty" :model-value="device ?? 'all'" @update:model-value="(v) => setQuery({ device: v === 'all' ? undefined : String(v) })">
-      <SelectTrigger class="h-9 w-52" :aria-label="t('overview.allDevices')"><SelectValue /></SelectTrigger>
-      <SelectContent>
-        <SelectItem value="all">{{ t('overview.allDevices') }}</SelectItem>
-        <SelectItem v-for="x in d?.devices ?? []" :key="x.id" :value="x.id">{{ x.name }}</SelectItem>
-      </SelectContent>
-    </Select>
-  </PageHeader>
+  <div class="mb-7 flex h-9 items-center justify-between gap-3">
+    <h1 class="font-semibold">{{ t('overview.title') }}</h1>
+    <Segmented v-if="!empty" v-model="days" :options="rangeOptions" :label="t('overview.rangeLabel')" />
+  </div>
 
   <StateMessage v-if="empty && health.data.value?.tapo === false" kind="setup" :title="t('states.noTapoTitle')" :body="t('states.noTapoBody')" />
   <StateMessage v-else-if="empty" :title="t('states.noDataTitle')" :body="t('states.noDataBody')" />
@@ -177,112 +192,125 @@ const rows = computed(() => {
                 :busy="q.isFetching.value" @action="q.refetch()" />
   <StateMessage v-else-if="q.isSuccess.value && !d?.devices.length" :title="t('states.noDataTitle')" :body="t('states.noDataBody')" />
 
-  <div v-else class="flex flex-col gap-4 transition-opacity" :class="q.isFetching.value && d ? 'opacity-60' : ''">
-    <!-- Hero: the one bold element of this view -->
-    <section class="grid gap-6 rounded-lg border border-border bg-card p-6 lg:grid-cols-[1fr_1.4fr]">
-      <div class="min-w-0">
-        <p class="text-sm text-muted-foreground">{{ selName ?? t('overview.allDevices') }}, {{ t('overview.monthSoFar', { month: nowLabel }) }}</p>
-        <div v-if="!k" class="mt-2 h-12 w-48 animate-pulse rounded-md bg-muted" />
-        <p v-else class="mt-1 text-4xl font-semibold">{{ kwh(k.mtd_wh, 1) }}<span class="ml-2 text-lg font-medium text-muted-foreground">kWh</span></p>
-        <p v-if="k && price != null" class="mt-1 text-lg font-medium">{{ eurFromWh(k.mtd_wh, price) }}</p>
-        <RouterLink v-else-if="k" to="/costs" class="mt-1 inline-block text-sm text-link hover:underline">{{ t('overview.tariffHint') }}</RouterLink>
-        <p v-if="k?.prev_month_same_wh" class="mt-3 text-sm"
-           :class="(ratio(k.mtd_complete_wh, k.prev_month_same_wh) ?? 0) > 0 ? 'text-bad' : 'text-good'">
-          <span class="tabular font-medium">{{ ((ratio(k.mtd_complete_wh, k.prev_month_same_wh) ?? 0) > 0 ? '+' : '') + pct(ratio(k.mtd_complete_wh, k.prev_month_same_wh)) }}</span>
-          <span class="ml-1 text-caption">{{ t('overview.vsPrevMonth') }}</span>
+  <div v-else class="flex flex-col divide-y divide-border">
+    <!-- hero: the only big numbers on the page -->
+    <section class="grid gap-6 pb-8 lg:grid-cols-[1.25fr_1fr_1fr] lg:gap-0 lg:divide-x lg:divide-border">
+      <div class="min-w-0 lg:pr-8">
+        <p class="text-xs font-medium text-caption">{{ t('overview.now') }}</p>
+        <p class="mt-2 text-4xl font-semibold tabular">
+          {{ nowW == null ? '–' : num(nowW, nowW < 100 ? 1 : 0) }}<span class="ml-1 text-lg font-medium tracking-normal text-caption">W</span>
+        </p>
+        <LiveSpark class="mb-2.5 mt-3.5" :points="live.total.value.slice(-300)" />
+        <p v-if="nowW != null && price != null" class="text-sm text-muted-foreground">{{ t('overview.atThisLoad', { value: money(nowW * 24 / 1000 * price) }) }}</p>
+        <p v-if="k?.base_w != null" class="text-sm text-caption">
+          {{ price != null ? t('overview.baseLoadLine', { w: num(k.base_w), eur: money(k.base_w * 8.76 * price, 0) }) : t('overview.baseLoadLineKwh', { w: num(k.base_w), kwh: num(k.base_w * 8.76) }) }}
         </p>
       </div>
-      <div v-if="k" class="flex min-w-0 flex-col justify-center gap-3">
-        <div class="flex flex-wrap items-baseline justify-between gap-2">
-          <span class="text-sm text-muted-foreground">{{ t('overview.forecastMonth') }}</span>
-          <span class="font-semibold tabular">{{ kwh(k.forecast_month_wh, 0) }}{{ NBSP }}kWh<template v-if="price != null">, {{ eurFromWh(k.forecast_month_wh, price) }}</template></span>
-        </div>
-        <div class="h-2 overflow-hidden rounded-full bg-selection" role="meter" :aria-valuenow="Math.round(monthProgress * 100)" aria-valuemin="0" aria-valuemax="100" :aria-label="t('overview.forecastMonth')">
-          <div class="h-full rounded-full bg-primary" :style="{ width: `${(monthProgress * 100).toFixed(1)}%` }" />
-        </div>
-        <dl class="mt-1 grid grid-cols-3 gap-4 text-sm">
-          <div><dt class="text-muted-foreground">{{ t('overview.prevMonth') }}</dt><dd class="text-md font-semibold tabular">{{ kwh(k.prev_month_wh, 0) }}{{ NBSP }}kWh</dd>
-            <dd v-if="price != null" class="text-caption">{{ eurFromWh(k.prev_month_wh, price) }}</dd></div>
-          <div><dt class="text-muted-foreground">{{ t('overview.yearForecast') }}</dt><dd class="text-md font-semibold tabular">{{ kwh(k.forecast_year_wh, 0) }}{{ NBSP }}kWh</dd>
-            <dd v-if="price != null" class="text-caption">{{ eurFromWh(k.forecast_year_wh, price, 0) }}</dd></div>
-          <div><dt class="text-muted-foreground">{{ t('overview.avgPerDay') }}</dt><dd class="text-md font-semibold tabular">{{ kwh(avgDay) }}{{ NBSP }}kWh</dd>
-            <dd class="text-caption">{{ t('overview.days', { n: d?.range.days }) }}</dd></div>
-        </dl>
+
+      <div class="min-w-0 border-t border-border pt-6 lg:border-t-0 lg:px-8 lg:pt-0">
+        <p class="text-xs font-medium text-caption">{{ t('overview.monthSoFar', { month }) }}</p>
+        <div v-if="!k" class="mt-2 h-8 w-32 animate-pulse rounded-md bg-muted" />
+        <template v-else>
+          <p class="mt-2 text-2xl font-semibold tabular">{{ kwh(k.mtd_wh, 1) }}<span class="ml-1 text-base font-medium tracking-normal text-caption">kWh</span></p>
+          <p v-if="price != null" class="mt-1 text-sm text-muted-foreground tabular">{{ eurFromWh(k.mtd_wh, price) }}</p>
+          <RouterLink v-else to="/costs" class="mt-1 inline-block text-sm text-link hover:underline">{{ t('overview.tariffHint') }}</RouterLink>
+          <p v-if="monthDelta != null" class="mt-2 text-sm text-muted-foreground">
+            <span class="font-medium tabular" :class="monthDelta > 0 ? 'text-bad' : 'text-good'">{{ (monthDelta > 0 ? '+' : '') + pct(monthDelta) }}</span>
+            {{ t('overview.vsMonthSameTime', { month: prevMonth }) }}
+          </p>
+        </template>
+      </div>
+
+      <div class="min-w-0 border-t border-border pt-6 lg:border-t-0 lg:pl-8 lg:pt-0">
+        <p class="text-xs font-medium text-caption">{{ t('overview.forecastOf', { month }) }}</p>
+        <div v-if="!k" class="mt-2 h-8 w-32 animate-pulse rounded-md bg-muted" />
+        <template v-else>
+          <p class="mt-2 text-2xl font-semibold tabular">
+            {{ kwh(k.forecast_month_wh, 0) }}<span class="ml-1 text-base font-medium tracking-normal text-caption">kWh</span>
+            <span v-if="price != null" class="ml-1.5 text-lg font-medium tracking-normal text-muted-foreground">{{ eurFromWh(k.forecast_month_wh, price) }}</span>
+          </p>
+          <div class="mb-2.5 mt-4 h-1 overflow-hidden rounded-full bg-border-strong" role="meter" :aria-valuenow="Math.round(monthProgress * 100)"
+               aria-valuemin="0" aria-valuemax="100" :aria-label="t('overview.forecastOf', { month })">
+            <div class="h-full origin-left rounded-full bg-primary" :style="{ transform: `scaleX(${monthProgress.toFixed(3)})` }" />
+          </div>
+          <p class="text-sm text-muted-foreground tabular">
+            {{ t('overview.yearLine', { kwh: kwh(k.forecast_year_wh, 0), eur: price != null ? `, ${money(k.forecast_year_wh / 1000 * price, 0)}` : '' }) }}
+          </p>
+        </template>
       </div>
     </section>
 
-    <section class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-      <KpiTile :label="t('overview.today')" :value="kwh(k?.today_wh)" unit="kWh" :loading="!k"
-               :delta="ratio(k?.today_wh, k?.yesterday_same_time_wh)" :delta-label="t('overview.vsYesterday')"
-               :sub="t('overview.yesterdayTotal', { value: `${kwh(k?.yesterday_wh)}${NBSP}kWh` })" />
-      <KpiTile :label="t('overview.now')" :value="livePower.w == null ? '–' : num(livePower.w, livePower.w < 100 ? 1 : 0)" unit="W"
-               :sub="livePower.w == null ? undefined : price != null ? t('overview.atThisLoad', { value: money(livePower.w * 24 / 1000 * price) }) : t('overview.plugsOnline', { n: livePower.n, of: livePower.of })" />
-      <KpiTile :label="t('overview.last7')" :value="kwh(k?.last7_wh)" unit="kWh" :loading="!k"
-               :delta="ratio(k?.last7_wh, k?.prev7_wh)" :delta-label="t('overview.vsPrev7')"
-               :sub="price != null ? eurFromWh(k?.last7_wh, price) : undefined" />
-      <KpiTile :label="t('overview.baseLoad')" :value="k?.base_w == null ? '–' : num(k.base_w)" unit="W" :loading="!k"
-               :sub="k?.base_w == null ? t('overview.baseLoadMissing') : price != null ? t('overview.baseLoadSub', { kwh: num(k.base_w * 8.76), eur: money(k.base_w * 8.76 * price, 0) }) : t('overview.baseLoadSubKwh', { kwh: num(k.base_w * 8.76) })" />
-    </section>
+    <Section :title="t('overview.daily')" :summary="dailySummary">
+      <div v-if="!d" class="h-[220px] animate-pulse rounded-md bg-muted" />
+      <EChart v-else :option="dailyOption" :height="220" :label="t('overview.daily')" />
+    </Section>
 
-    <Panel :title="t('overview.daily')"
-           :description="d ? `${dayShort(d.range.start)} – ${dayShort(d.range.end)}, ${kwh(k?.range_wh)} kWh${price != null ? `, ${eurFromWh(k?.range_wh, price)}` : ''}${k?.peak_day ? `. ${t('overview.peakDay', { day: dayLong(k.peak_day.day) })}` : ''}` : undefined">
-      <ul v-if="series.length > 1" class="mb-2 flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground">
-        <li v-for="s in series" :key="s.key" class="flex items-center gap-1.5">
-          <span class="size-2.5 rounded-sm" :style="{ background: theme.slotColor(s.slot) }" aria-hidden="true" />{{ s.label }}
-        </li>
-      </ul>
-      <div v-if="!d" class="h-[280px] animate-pulse rounded-md bg-muted" />
-      <EChart v-else :option="dailyOption" :height="280" :label="t('overview.daily')" />
-    </Panel>
-
-    <section class="grid gap-4 lg:grid-cols-2">
-      <Panel :title="t('overview.months')" :description="t('overview.monthsSub')">
-        <div v-if="!d" class="h-[240px] animate-pulse rounded-md bg-muted" />
-        <EChart v-else :option="monthsOption" :height="240" :label="t('overview.months')" />
-      </Panel>
-      <Panel :title="t('overview.profile')" :description="`${t('overview.profileSub')}, ${t('overview.profileDays', { n: d?.heat_days ?? 0 })}`">
-        <div v-if="!d" class="h-[240px] animate-pulse rounded-md bg-muted" />
-        <EChart v-else :option="heatOption" :height="240" :label="t('overview.profile')" />
-      </Panel>
-    </section>
-
-    <Panel :title="t('overview.devices')" :description="t('overview.devicesSub')" :padded="false">
-      <template #actions>
-        <Button v-if="device" type="button" variant="ghost" size="sm" @click="setQuery({ device: undefined })">{{ t('overview.resetFilter') }}</Button>
-      </template>
-      <div class="overflow-x-auto px-2 pb-2 pt-3">
-        <table class="w-full min-w-[760px] text-sm">
+    <Section :title="t('overview.devices')" :summary="t('overview.devicesSort')">
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm">
           <thead>
-            <tr class="text-left text-caption">
-              <th class="px-3 py-2 font-medium">{{ t('overview.col.device') }}</th>
-              <th class="w-[22%] px-3 py-2 font-medium">{{ t('overview.days', { n: d?.range.days }) }}</th>
-              <th class="px-3 py-2 text-right font-medium">kWh</th>
-              <th v-if="price != null" class="px-3 py-2 text-right font-medium">EUR</th>
-              <th class="px-3 py-2 text-right font-medium">{{ t('overview.col.share') }}</th>
-              <th class="px-3 py-2 text-right font-medium">{{ t('overview.col.base') }}</th>
-              <th class="px-3 py-2 text-right font-medium">{{ t('overview.col.now') }}</th>
-              <th class="px-3 py-2 font-medium">{{ t('overview.col.trend') }}</th>
+            <tr class="text-xs text-caption">
+              <th class="h-8 pr-3 text-left font-medium">{{ t('overview.col.device') }}</th>
+              <th class="px-3 text-right font-medium">{{ t('overview.col.now') }}</th>
+              <th class="hidden px-3 text-right font-medium sm:table-cell">{{ t('overview.col.today') }}</th>
+              <th class="px-3 text-right font-medium">{{ t('overview.days', { n: d?.range.days }) }}</th>
+              <th v-if="price != null" class="px-3 text-right font-medium">{{ t('overview.cost') }}</th>
+              <th class="hidden px-3 text-right font-medium md:table-cell">{{ t('overview.col.trend') }}</th>
+              <th class="hidden pl-3 text-right font-medium md:table-cell">{{ t('overview.col.share') }}</th>
             </tr>
           </thead>
           <tbody>
             <tr v-for="x in rows" :key="x.id" tabindex="0"
-                class="cursor-pointer border-t border-border transition-[background-color] hover:bg-accent focus-visible:outline-offset-[-2px]"
-                :class="device === x.id ? 'bg-selection hover:bg-selection' : ''" :aria-selected="device === x.id"
-                @click="setQuery({ device: device === x.id ? undefined : x.id })" @keydown.enter="setQuery({ device: device === x.id ? undefined : x.id })">
-              <td class="max-w-56 truncate px-3 py-2.5 font-medium">
-                <span class="mr-2 inline-block size-2 rounded-full align-[1px]" :style="{ background: theme.slotColor(x.slot) }" aria-hidden="true" />{{ x.name }}
+                class="h-11 cursor-pointer border-t border-border transition-[background-color] hover:bg-muted focus-visible:outline-offset-[-2px]"
+                @click="open(x.id)" @keydown.enter="open(x.id)">
+              <td class="max-w-64 pr-3">
+                <div class="flex min-w-0 items-center gap-2.5">
+                  <span class="size-1.5 shrink-0 rounded-full" :class="x.on ? 'bg-good-fill' : 'bg-border-strong'" aria-hidden="true" />
+                  <span class="truncate font-medium">{{ x.name }}</span>
+                  <span v-if="x.room" class="hidden truncate text-xs text-caption sm:inline">{{ x.room }}</span>
+                </div>
               </td>
-              <td class="px-3 py-2.5"><div class="h-1.5 rounded-full bg-muted"><div class="h-full min-w-[2px] rounded-full bg-chart-1" :style="{ width: `${(x.bar * 100).toFixed(1)}%`, background: 'var(--chart-1)' }" /></div></td>
-              <td class="px-3 py-2.5 text-right font-medium tabular">{{ kwh(x.range_wh) }}</td>
-              <td v-if="price != null" class="px-3 py-2.5 text-right tabular">{{ eurFromWh(x.range_wh, price) }}</td>
-              <td class="px-3 py-2.5 text-right text-muted-foreground tabular">{{ pct(x.share) }}</td>
-              <td class="px-3 py-2.5 text-right text-muted-foreground tabular">{{ x.base_w == null ? '–' : watts(x.base_w) }}</td>
-              <td class="px-3 py-2.5 text-right tabular">{{ live.snapshot.value?.devices[x.id] ? watts(live.snapshot.value.devices[x.id]!.w) : '–' }}</td>
-              <td class="px-3 py-2.5"><Sparkline :values="x.spark" /></td>
+              <td class="px-3 text-right">
+                <span class="inline-flex items-center justify-end gap-2.5">
+                  <span class="min-w-14 tabular" :class="x.on && (x.w ?? 0) >= 0.5 ? 'font-medium' : 'text-caption'">
+                    {{ !x.on ? t('app.off') : x.w == null ? '–' : watts(x.w) }}
+                  </span>
+                  <span class="hidden h-1 w-16 overflow-hidden rounded-full bg-border sm:block" aria-hidden="true">
+                    <span class="block h-full origin-left rounded-full bg-primary transition-transform duration-(--ease-settle-ms) ease-settle"
+                          :style="{ transform: `scaleX(${x.bar.toFixed(3)})` }" />
+                  </span>
+                </span>
+              </td>
+              <td class="hidden px-3 text-right text-muted-foreground tabular sm:table-cell">{{ kwh(x.today_wh, 2) }}</td>
+              <td class="px-3 text-right tabular">{{ kwh(x.range_wh) }}{{ NBSP }}kWh</td>
+              <td v-if="price != null" class="px-3 text-right tabular">{{ eurFromWh(x.range_wh, price) }}</td>
+              <td class="hidden px-3 text-right md:table-cell"><Sparkline :values="x.spark" class="inline-block" /></td>
+              <td class="hidden pl-3 text-right text-muted-foreground tabular md:table-cell">{{ pct(x.share) }}</td>
             </tr>
           </tbody>
+          <tfoot>
+            <tr class="h-10 border-t border-border-strong font-medium text-muted-foreground">
+              <td class="pr-3">{{ t('overview.sumPlugs') }}</td>
+              <td class="px-3 text-right tabular"><span class="inline-flex items-center justify-end gap-2.5"><span class="min-w-14">{{ totals.w == null ? '–' : watts(totals.w) }}</span><span class="hidden w-16 sm:block" aria-hidden="true" /></span></td>
+              <td class="hidden px-3 text-right tabular sm:table-cell">{{ kwh(totals.today, 2) }}</td>
+              <td class="px-3 text-right tabular">{{ kwh(totals.range) }}{{ NBSP }}kWh</td>
+              <td v-if="price != null" class="px-3 text-right tabular">{{ eurFromWh(totals.range, price) }}</td>
+              <td class="hidden md:table-cell" /><td class="hidden md:table-cell" />
+            </tr>
+          </tfoot>
         </table>
       </div>
-    </Panel>
+    </Section>
+
+    <div class="grid gap-x-12 lg:grid-cols-2">
+      <Section :title="t('overview.months')" :summary="monthsSummary">
+        <div v-if="!d" class="h-[180px] animate-pulse rounded-md bg-muted" />
+        <EChart v-else :option="monthsOption" :height="180" :label="t('overview.months')" />
+      </Section>
+      <Section :title="t('overview.profile')" :summary="t('overview.profileDays', { n: d?.heat_days ?? 0 })" class="border-t border-border lg:border-t-0">
+        <div v-if="!d" class="h-[180px] animate-pulse rounded-md bg-muted" />
+        <EChart v-else :option="heatOption" :height="180" :label="t('overview.profile')" />
+      </Section>
+    </div>
   </div>
 </template>

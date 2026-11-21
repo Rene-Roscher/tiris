@@ -31,25 +31,27 @@ const loggedIn = () => window.location.reload()
 <template>
   <LoginScreen v-if="needLogin" @done="loggedIn" />
   <TooltipProvider v-else :delay-duration="400" :skip-delay-duration="200">
-    <div class="flex min-h-dvh">
-      <aside class="sticky top-0 hidden h-dvh w-56 shrink-0 border-r border-border md:block">
+    <div class="md:grid md:min-h-dvh md:grid-cols-[228px_minmax(0,1fr)]">
+      <aside class="sticky top-0 hidden h-dvh md:block">
         <AppSidebar />
       </aside>
-      <div class="flex min-w-0 flex-1 flex-col">
-        <header class="sticky top-0 z-raised flex h-12 items-center gap-2 border-b border-border bg-background px-4 md:hidden">
-          <Button type="button" variant="ghost" size="icon-sm" :aria-label="t('app.openMenu')" @click="mobileOpen = true">
-            <Menu class="size-4" aria-hidden="true" />
-          </Button>
-          <Logo />
-          <span class="font-semibold">tiris</span>
-        </header>
-        <main class="mx-auto w-full max-w-[1280px] flex-1 px-4 py-6 md:px-8 md:py-8">
-          <RouterView />
-        </main>
+      <div class="min-w-0 md:py-2 md:pr-2">
+        <div class="flex min-h-dvh flex-col bg-background md:min-h-[calc(100dvh-16px)] md:rounded-xl md:border md:border-border md:shadow-xs">
+          <header class="sticky top-0 z-raised flex h-12 items-center gap-2 border-b border-border bg-background px-4 md:hidden">
+            <Button type="button" variant="ghost" size="icon-sm" :aria-label="t('app.openMenu')" @click="mobileOpen = true">
+              <Menu class="size-4" aria-hidden="true" />
+            </Button>
+            <Logo />
+            <span class="font-semibold">tiris</span>
+          </header>
+          <main class="w-full max-w-[1120px] flex-1 self-center px-4 pb-16 pt-4 md:px-10 md:pt-5">
+            <RouterView />
+          </main>
+        </div>
       </div>
     </div>
     <Sheet v-model:open="mobileOpen">
-      <SheetContent side="left" class="w-64 p-0">
+      <SheetContent side="left" class="w-64 bg-canvas p-0">
         <SheetTitle class="sr-only">tiris</SheetTitle>
         <SheetDescription class="sr-only">{{ t('app.tagline') }}</SheetDescription>
         <AppSidebar @navigate="mobileOpen = false" />

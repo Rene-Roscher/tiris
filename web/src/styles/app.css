@@ -2,6 +2,8 @@
 @import "tw-animate-css";
 @import "@fontsource-variable/geist" layer(base);
 @import "@fontsource-variable/geist-mono" layer(base);
+@import "vue-sonner/style.css" layer(components);
+@import "./toast.css" layer(components);
 
 @custom-variant dark (&:where(.dark, .dark *));
 
@@ -17,12 +19,17 @@
 @layer base {
   :root {
     color-scheme: light;
-    --background: #fafafa;          /* page */
+    --canvas: #f2f2f0;              /* behind the panel: sidebar ground */
+    --background: #ffffff;          /* the page panel */
     --card: #ffffff;                /* raised surface */
     --popover: #ffffff;
     --muted: #f4f4f5;               /* subtle surface, hover */
     --accent: #f4f4f5;              /* shadcn: hover surface (not the brand colour) */
     --active: #ebebed;              /* pressed / selected surface */
+    --side-hover: #e8e8e5;          /* hover on the canvas */
+    --bar: #cfd0d4;                 /* neutral chart marks */
+    --bar-hover: #a9abb2;
+    --heat-0: #f1f1f0;              /* empty cell of one-hue scales */
     --border: #e4e4e7;
     --border-strong: #d4d4d8;
     --input: #8b8b94;               /* input boundary, >= 3:1 */
@@ -61,12 +68,17 @@
 
   .dark {
     color-scheme: dark;
-    --background: #0a0a0b;
+    --canvas: #08080a;
+    --background: #0f0f11;
     --card: #111113;
     --popover: #141416;
     --muted: #1a1a1d;
     --accent: #1a1a1d;
     --active: #232327;
+    --side-hover: #141416;
+    --bar: #2e2f35;
+    --bar-hover: #4a4b53;
+    --heat-0: #151518;
     --border: #27272b;
     --border-strong: #36363c;
     --input: #64646e;
@@ -133,6 +145,9 @@
   --shadow-float: var(--shadow-float);
 
   --color-background: var(--background);
+  --color-canvas: var(--canvas);
+  --color-side-hover: var(--side-hover);
+  --color-bar: var(--bar);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
   --color-card-foreground: var(--card-foreground);
@@ -198,6 +213,8 @@
     -webkit-font-smoothing: antialiased;
     font-feature-settings: "ss01" 0;
   }
+  /* from md up the page is a raised panel on the canvas (see App.vue); on phones the panel is the page */
+  @media (min-width: 768px) { html, body { background: var(--canvas); } }
   ::selection { background: var(--selection); }
   :focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
   @media (prefers-reduced-motion: reduce) {
