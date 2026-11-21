@@ -83,7 +83,7 @@ const mmss = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, 
     <div class="flex flex-wrap items-center gap-4 px-4 py-3">
       <Switch :model-value="on" :disabled="busy || !reachable || (d.protected && on)"
               :aria-label="d.name" @update:model-value="(v: boolean) => setPower(v)" />
-      <div class="min-w-0 flex-1">
+      <div class="min-w-[12rem] flex-1">
         <div class="flex flex-wrap items-center gap-2">
           <input v-if="editing" ref="nameInput" v-model="name" maxlength="64" :aria-label="t('devices.rename')"
                  class="h-7 min-w-56 rounded-md border border-ring bg-card px-2 font-medium"
@@ -120,10 +120,12 @@ const mmss = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, 
           </button>
         </div>
       </div>
-      <p class="w-20 text-right text-md font-semibold tabular" :class="on ? '' : 'text-caption'">{{ on ? watts(liveW) : '–' }}</p>
-      <Button type="button" variant="outline" size="sm" :aria-expanded="open" @click="open = !open">
-        {{ open ? t('common.close') : t('devices.manage') }}
-      </Button>
+      <div class="flex w-full items-center justify-end gap-3 sm:w-auto">
+        <p class="w-20 text-right text-md font-semibold tabular" :class="on ? '' : 'text-caption'">{{ on ? watts(liveW) : '–' }}</p>
+        <Button type="button" variant="outline" size="sm" :aria-expanded="open" @click="open = !open">
+          {{ open ? t('common.close') : t('devices.manage') }}
+        </Button>
+      </div>
     </div>
 
     <div v-if="open" class="border-t border-border px-4 py-4">

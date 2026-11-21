@@ -73,16 +73,18 @@ const noTapo = computed(() => q.error.value instanceof ApiError && q.error.value
   <StateMessage v-else-if="!all.length" :title="t('states.noDataTitle')" :body="t('states.noDataBody')" />
 
   <div v-else class="flex flex-col gap-6">
-    <dl class="flex flex-wrap gap-x-8 gap-y-2 rounded-lg border border-border bg-card px-5 py-3.5">
-      <div v-for="s in stats" :key="s.label" class="flex items-baseline gap-1.5">
-        <dt class="sr-only">{{ s.label }}</dt>
-        <dd class="text-lg font-semibold tabular" :class="s.warn && s.n ? 'text-warn' : ''">{{ s.n }}</dd>
-        <span class="text-sm text-muted-foreground" aria-hidden="true">{{ s.label }}</span>
-      </div>
-    </dl>
+    <ul class="flex flex-wrap gap-x-8 gap-y-2 rounded-lg border border-border bg-card px-5 py-3.5">
+      <li v-for="s in stats" :key="s.label" class="flex items-baseline gap-1.5">
+        <span class="text-lg font-semibold tabular" :class="s.warn && s.n ? 'text-warn' : ''">{{ s.n }}</span>
+        <span class="text-sm text-muted-foreground">{{ s.label }}</span>
+      </li>
+    </ul>
 
     <section v-for="[r, devs] in groups" :key="r" class="flex flex-col gap-2">
-      <h2 class="text-sm font-medium text-muted-foreground">{{ r || t('devices.noRoom') }} <span class="text-caption">{{ devs.length }}</span></h2>
+      <div class="flex items-baseline gap-2">
+        <h2 class="text-sm font-medium text-muted-foreground">{{ r || t('devices.noRoom') }}</h2>
+        <span class="text-sm text-caption tabular">{{ devs.length }}</span>
+      </div>
       <DeviceCard v-for="d in devs" :key="d.id" :device="d" :live-w="live.snapshot.value?.devices[d.id]?.w" :rooms="rooms" :categories="categories" />
     </section>
 

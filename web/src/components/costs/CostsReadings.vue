@@ -40,7 +40,7 @@ const remove = (day: string) => run(() => api.del(`/api/meters/${id}/readings/${
         </tr></thead>
         <tbody>
           <tr v-for="iv in [...data.intervals].reverse()" :key="iv.from" class="border-t border-border">
-            <td class="py-2 pr-3">{{ dateMedium(iv.from) }} – {{ dateMedium(iv.to) }}<span v-if="iv.estimated" class="text-caption">, {{ t('costs.estimated') }}</span></td>
+            <td class="py-2 pr-3 tabular">{{ dateMedium(iv.from) }} – {{ dateMedium(iv.to) }}<span v-if="iv.estimated" class="text-caption">, {{ t('costs.estimated') }}</span></td>
             <td class="px-3 py-2 text-right tabular">{{ num(iv.kwh) }}</td>
             <td class="px-3 py-2 text-right tabular">{{ num(iv.kwh_day, 2) }}</td>
             <td v-if="data.meter.kind === 'electricity'" class="py-2 pl-3 text-right tabular text-muted-foreground">

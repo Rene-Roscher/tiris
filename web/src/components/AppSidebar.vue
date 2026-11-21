@@ -41,7 +41,8 @@ const items = computed(() => [
       <component :is="i.icon" class="size-4" aria-hidden="true" />
       {{ i.label }}
     </RouterLink>
-    <div class="mt-auto flex flex-col gap-1.5 px-2 text-sm text-caption">
+    <div class="flex-1" aria-hidden="true" />
+    <div class="flex flex-col gap-1.5 px-2 text-sm text-caption">
       <p v-if="enabled" class="flex items-center gap-2">
         <span class="size-1.5 rounded-full" :class="connected ? 'bg-good-fill' : 'bg-caption'" aria-hidden="true" />
         {{ connected ? t('app.liveOn') : t('app.liveOff') }}

@@ -15,7 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useChartTheme } from '@/composables/useChartTheme'
 import { useLive } from '@/composables/useLive'
-import { api } from '@/lib/api'
+import { ApiError, api } from '@/lib/api'
 import { dayLong, dayShort, eurFromWh, kwh, money, monthLong, monthShort, NBSP, num, pct, watts } from '@/lib/format'
 import type { Overview } from '@/lib/types'
 
@@ -37,6 +37,9 @@ const q = useQuery({
   refetchInterval: 5 * 60_000,
 })
 const d = computed(() => q.data.value)
+// 503 = no data yet (or no Tapo account): an empty state, not an error
+const health = useQuery({ queryKey: ['health'], queryFn: () => api.get<{ tapo: boolean }>('/api/health'), staleTime: 60_000 })
+const empty = computed(() => q.error.value instanceof ApiError && q.error.value.status === 503)
 const k = computed(() => d.value?.kpi)
 const price = computed(() => d.value?.price ?? null)
 const devById = computed(() => Object.fromEntries((d.value?.devices ?? []).map((x) => [x.id, x])))
@@ -150,7 +153,7 @@ const rows = computed(() => {
 
 <template>
   <PageHeader :title="t('overview.title')">
-    <Tabs :model-value="String(days)" @update:model-value="(v) => setQuery({ days: String(v) })">
+    <Tabs v-if="!empty" :model-value="String(days)" @update:model-value="(v) => setQuery({ days: String(v) })">
       <TabsList>
         <TabsTrigger value="7">{{ t('overview.range.d7') }}</TabsTrigger>
         <TabsTrigger value="30">{{ t('overview.range.d30') }}</TabsTrigger>
@@ -158,7 +161,7 @@ const rows = computed(() => {
         <TabsTrigger value="400">{{ t('overview.range.all') }}</TabsTrigger>
       </TabsList>
     </Tabs>
-    <Select :model-value="device ?? 'all'" @update:model-value="(v) => setQuery({ device: v === 'all' ? undefined : String(v) })">
+    <Select v-if="!empty" :model-value="device ?? 'all'" @update:model-value="(v) => setQuery({ device: v === 'all' ? undefined : String(v) })">
       <SelectTrigger class="h-9 w-52" :aria-label="t('overview.allDevices')"><SelectValue /></SelectTrigger>
       <SelectContent>
         <SelectItem value="all">{{ t('overview.allDevices') }}</SelectItem>
@@ -167,7 +170,9 @@ const rows = computed(() => {
     </Select>
   </PageHeader>
 
-  <StateMessage v-if="q.isError.value && !d" kind="error" :title="t('states.errorTitle')"
+  <StateMessage v-if="empty && health.data.value?.tapo === false" kind="setup" :title="t('states.noTapoTitle')" :body="t('states.noTapoBody')" />
+  <StateMessage v-else-if="empty" :title="t('states.noDataTitle')" :body="t('states.noDataBody')" />
+  <StateMessage v-else-if="q.isError.value && !d" kind="error" :title="t('states.errorTitle')"
                 :body="t('states.errorBody', { detail: String(q.error.value?.message ?? '') })" :action="t('common.retry')"
                 :busy="q.isFetching.value" @action="q.refetch()" />
   <StateMessage v-else-if="q.isSuccess.value && !d?.devices.length" :title="t('states.noDataTitle')" :body="t('states.noDataBody')" />

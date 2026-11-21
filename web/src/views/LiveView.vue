@@ -151,10 +151,7 @@ const perHour = (w: number | null | undefined) => (w == null || price.value == n
     <section class="grid gap-6 rounded-lg border border-border bg-card p-6 lg:grid-cols-[minmax(240px,0.8fr)_2fr]">
       <div class="flex min-w-0 flex-col">
         <p class="flex items-center gap-2 text-sm text-muted-foreground">
-          <span class="relative flex size-2" aria-hidden="true">
-            <span v-if="live.connected.value" class="absolute inline-flex size-full animate-ping rounded-full bg-good-fill opacity-60 motion-reduce:hidden" />
-            <span class="relative inline-flex size-2 rounded-full" :class="live.connected.value ? 'bg-good-fill' : 'bg-caption'" />
-          </span>
+          <span class="size-2 shrink-0 rounded-full" :class="live.connected.value ? 'bg-good-fill' : 'bg-caption'" aria-hidden="true" />
           {{ live.connected.value ? t('live.connected', { s: snap?.interval_s ?? 2 }) : t('live.connecting') }}
         </p>
         <p class="mt-2 text-4xl font-semibold tabular" aria-live="off">
@@ -165,7 +162,8 @@ const perHour = (w: number | null | undefined) => (w == null || price.value == n
           <span>{{ t('live.perDay', { value: money(perHour(totalW)! * 24) }) }}</span>
           <span>{{ t('live.perMonth', { value: money(perHour(totalW)! * 24 * 30.4, 0) }) }}</span>
         </div>
-        <dl class="mt-auto grid grid-cols-2 gap-x-4 gap-y-3 pt-6 text-sm">
+        <div class="min-h-6 flex-1" aria-hidden="true" />
+        <dl class="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
           <div><dt class="text-muted-foreground">{{ t('live.voltage') }}</dt><dd class="text-md font-semibold tabular">{{ avgV ? `${num(avgV, 1)}${NBSP}V` : '–' }}</dd></div>
           <div><dt class="text-muted-foreground">{{ t('live.online') }}</dt><dd class="text-md font-semibold tabular">{{ snap?.online ?? '–' }}/{{ snap?.known ?? '–' }}</dd></div>
           <div><dt class="text-muted-foreground">{{ t('live.active') }}</dt><dd class="text-md font-semibold tabular">{{ activeCount }}</dd></div>
@@ -187,15 +185,14 @@ const perHour = (w: number | null | undefined) => (w == null || price.value == n
     </section>
 
     <section class="grid grid-cols-[repeat(auto-fill,minmax(240px,1fr))] gap-3">
-      <article v-for="c in cards" :key="c.id" class="flex min-w-0 flex-col gap-2 rounded-lg border border-border bg-card px-4 py-3.5"
-               :class="c.st === 'idle' || c.st === 'offline' ? 'opacity-70' : ''">
-        <header class="flex items-center gap-2 text-sm">
-          <span class="size-2 shrink-0 rounded-full" :style="{ background: theme.slotColor(c.slot) }" aria-hidden="true" />
-          <span class="truncate font-medium">{{ c.name }}</span>
-          <span class="ml-auto shrink-0 rounded-full px-2 py-px text-xs"
+      <article v-for="c in cards" :key="c.id" class="flex min-w-0 flex-col gap-2 rounded-lg border border-border bg-card px-4 py-3.5">
+        <header class="flex items-start gap-2 text-sm">
+          <span class="mt-1.5 size-2 shrink-0 rounded-full" :style="{ background: theme.slotColor(c.slot) }" aria-hidden="true" />
+          <span class="min-w-0 flex-1 font-medium [overflow-wrap:anywhere]">{{ c.name }}</span>
+          <span class="shrink-0 rounded-full px-2 py-px text-xs"
                 :class="c.st === 'on' ? 'bg-selection font-medium text-foreground' : 'bg-muted text-muted-foreground'">{{ t(`live.status.${c.st}`) }}</span>
         </header>
-        <p class="text-2xl font-semibold tabular">{{ c.live ? watts(c.live.w) : '–' }}</p>
+        <p class="text-2xl font-semibold tabular" :class="c.st === 'idle' || c.st === 'offline' ? 'text-caption' : ''">{{ c.live ? watts(c.live.w) : '–' }}</p>
         <Sparkline :values="c.spark" :width="240" :height="32" class="w-full" />
         <div class="h-1 overflow-hidden rounded-full bg-muted" :aria-label="`${num(c.share * 100)} %`">
           <div class="h-full rounded-full bg-primary transition-[width] duration-300" :style="{ width: `${(c.share * 100).toFixed(1)}%` }" />

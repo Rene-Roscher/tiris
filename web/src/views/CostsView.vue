@@ -101,7 +101,7 @@ const monthsOption = computed<EChartsOption>(() => {
       <TabsList><TabsTrigger v-for="m in active" :key="m.id" :value="String(m.id)">{{ m.name }}</TabsTrigger></TabsList>
     </Tabs>
     <Button v-if="d" type="button" variant="outline" size="sm" @click="openDialog(d.meter)"><Pencil class="size-4" aria-hidden="true" />{{ t('common.edit') }}</Button>
-    <Button type="button" size="sm" @click="openDialog(null)"><Plus class="size-4" aria-hidden="true" />{{ t('costs.addMeter') }}</Button>
+    <Button v-if="active.length" type="button" size="sm" @click="openDialog(null)"><Plus class="size-4" aria-hidden="true" />{{ t('costs.addMeter') }}</Button>
   </PageHeader>
 
   <StateMessage v-if="meters.isError.value" kind="error" :title="t('states.errorTitle')" :body="t('states.errorBody', { detail: meters.error.value?.message ?? '' })"

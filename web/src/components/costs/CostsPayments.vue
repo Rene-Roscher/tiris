@@ -54,7 +54,7 @@ const remove = (id: number) => run(() => api.del(`/api/payments/${id}`), t('comm
         </tr></thead>
         <tbody>
           <tr v-for="y in q.data.value.by_year" :key="y.year" class="border-t border-border">
-            <td class="py-2 pr-3 font-medium">{{ y.year }}</td>
+            <td class="py-2 pr-3 font-medium tabular">{{ y.year }}</td>
             <td v-for="k in kinds" :key="k" class="px-3 py-2 text-right tabular">{{ y[k] != null ? money(y[k]) : '–' }}</td>
             <td v-if="q.data.value.by_year.some((x) => x.unassigned)" class="px-3 py-2 text-right tabular text-muted-foreground">{{ y.unassigned != null ? money(y.unassigned) : '–' }}</td>
             <td class="px-3 py-2 text-right font-medium tabular">{{ money(y.total) }}</td>
@@ -77,7 +77,7 @@ const remove = (id: number) => run(() => api.del(`/api/payments/${id}`), t('comm
         <table class="w-full min-w-[560px] text-sm">
           <tbody>
             <tr v-for="p in list" :key="p.id" class="border-t border-border">
-              <td class="py-1.5 pr-3 whitespace-nowrap">{{ dateMedium(p.day) }}</td>
+              <td class="py-1.5 pr-3 whitespace-nowrap tabular">{{ dateMedium(p.day) }}</td>
               <td class="px-3 py-1.5 text-right font-medium tabular whitespace-nowrap" :class="p.amount < 0 ? 'text-good' : ''">{{ money(p.amount) }}</td>
               <td class="px-3 py-1.5">
                 <Select :model-value="p.meter_id ? String(p.meter_id) : 'none'" :disabled="busy" @update:model-value="(v) => assign(p.id, String(v))">
