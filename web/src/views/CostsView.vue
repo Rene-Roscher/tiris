@@ -16,6 +16,7 @@ import StateMessage from '@/components/StateMessage.vue'
 import { Button } from '@/components/ui/button'
 import { useChartTheme } from '@/composables/useChartTheme'
 import { mix } from '@/lib/charts'
+import { useDevices } from '@/composables/useDevices'
 import { api } from '@/lib/api'
 import { dateMedium, money, monthLong, monthShort, NBSP, num } from '@/lib/format'
 import type { Meter, MeterCosts } from '@/lib/types'
@@ -44,6 +45,7 @@ const b = computed(() => d.value?.billing)
 const price = computed(() => d.value?.price_eur_kwh ?? null)
 const tariff = computed(() => d.value?.tariffs.at(-1))
 
+const { color: devColor } = useDevices()
 const dialog = ref(false)
 const editing = ref<Meter | null>(null)
 function openDialog(m: Meter | null) { editing.value = m; dialog.value = true }
@@ -192,8 +194,8 @@ const monthsOption = computed<EChartsOption>(() => {
             </tr></thead>
             <tbody>
               <tr v-for="x in d.devices" :key="x.id" class="h-11 border-t border-border">
-                <td class="max-w-56 truncate pr-3 font-medium">{{ x.name }}</td>
-                <td class="px-3"><div class="h-1 overflow-hidden rounded-full bg-border"><div class="h-full origin-left rounded-full bg-primary" :style="{ transform: `scaleX(${(x.eur_year / maxDev).toFixed(3)})` }" /></div></td>
+                <td class="max-w-56 pr-3"><span class="flex min-w-0 items-center gap-2.5"><span class="size-2.5 shrink-0 rounded-sm" :style="{ background: devColor(x.id) }" aria-hidden="true" /><span class="truncate font-medium">{{ x.name }}</span></span></td>
+                <td class="px-3"><div class="h-1 overflow-hidden rounded-full bg-border"><div class="h-full origin-left rounded-full" :style="{ background: devColor(x.id), transform: `scaleX(${(x.eur_year / maxDev).toFixed(3)})` }" /></div></td>
                 <td class="px-3 text-right font-medium tabular">{{ money(x.eur_year) }}</td>
                 <td class="px-3 text-right text-muted-foreground tabular">{{ money(x.eur_month) }}</td>
                 <td class="px-3 text-right text-muted-foreground tabular">{{ num(x.kwh_year) }}</td>

@@ -5,7 +5,7 @@
 */
 import { useQuery } from '@tanstack/vue-query'
 import type { EChartsOption } from 'echarts'
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import EChart from '@/components/charts/EChart.vue'
@@ -18,8 +18,9 @@ import { useChartTheme } from '@/composables/useChartTheme'
 import { useLive } from '@/composables/useLive'
 import { ApiError, api } from '@/lib/api'
 import { mix } from '@/lib/charts'
-import { dayLong, dayShort, eurFromWh, kwh, money, monthLong, monthShort, NBSP, num, pct, watts } from '@/lib/format'
-import type { Device, Overview } from '@/lib/types'
+import { slotVar } from '@/lib/colors'
+import { dayLong, dayShort, eurFromWh, kwh, money, monthLong, monthShort, NBSP, num, pct, time, watts } from '@/lib/format'
+import type { Device, Overview, SeriesResponse } from '@/lib/types'
 
 const { t } = useI18n()
 const route = useRoute()
@@ -52,6 +53,21 @@ const k = computed(() => d.value?.kpi)
 const price = computed(() => d.value?.price ?? null)
 const meta = computed(() => Object.fromEntries((devs.data.value?.devices ?? []).map((x) => [x.id, x])))
 const names = computed(() => Object.fromEntries((d.value?.devices ?? []).map((x) => [x.id, x.name])))
+const slots = computed(() => Object.fromEntries((d.value?.devices ?? []).map((x) => [x.id, x.slot])))
+const tokenOf = (key: string) => (key === 'other' ? 'chart-other' : `chart-${slots.value[key] || 'other'}`)
+
+/* series: the coloured devices plus "other"; the legend toggles them in every chart of this view */
+const seriesKeys = computed(() => (d.value?.series_keys ?? []).map((key) => ({
+  key, label: key === 'other' ? t('overview.other') : names.value[key] ?? key, css: key === 'other' ? slotVar(0) : slotVar(slots.value[key]),
+})))
+const hidden = ref<Set<string>>(new Set())
+function toggle(key: string) {
+  const h = new Set(hidden.value)
+  if (h.has(key)) h.delete(key)
+  else if (h.size < seriesKeys.value.length - 1) h.add(key)
+  hidden.value = h
+}
+const legendSelected = computed(() => Object.fromEntries(seriesKeys.value.map((s) => [s.label, !hidden.value.has(s.key)])))
 const ratio = (a?: number | null, b?: number | null) => (a == null || !b ? null : a / b - 1)
 
 const month = computed(() => new Intl.DateTimeFormat(undefined, { month: 'long' }).format(d.value ? new Date(d.value.now) : new Date()))
@@ -69,31 +85,35 @@ const liveW = (id: string) => live.snapshot.value?.devices[id]?.w ?? null
 const dailyOption = computed<EChartsOption>(() => {
   const th = theme.value, rows = d.value?.daily ?? [], last = rows.length - 1
   const done = rows.slice(0, -1), avg = done.reduce((s, r) => s + r.total, 0) / Math.max(1, done.length) / 1000
-  const caption = th.token('caption')
+  const caption = th.token('caption'), keys = seriesKeys.value
   return {
     ...th.base,
+    legend: { show: false, selected: legendSelected.value },
     grid: { left: 0, right: 0, top: 8, bottom: 0, containLabel: true },
-    tooltip: { ...th.base.tooltip, trigger: 'axis', axisPointer: { type: 'none' },
+    tooltip: { ...th.base.tooltip, trigger: 'axis', axisPointer: { type: 'shadow', shadowStyle: { color: th.token('muted') } },
       formatter: (ps: unknown) => {
         const i = (ps as { dataIndex: number }[])[0]!.dataIndex, r = rows[i]!
-        const parts = Object.entries(r.by).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]).slice(0, 4)
-        const line = (a: string, b: string) => `<div style="display:flex;justify-content:space-between;gap:16px"><span>${a}</span><b style="font-weight:500">${b}</b></div>`
-        return `<div style="min-width:190px"><div style="display:flex;justify-content:space-between;gap:16px;margin-bottom:4px;font-weight:600"><span>${dayLong(r.day)}</span><span>${kwh(r.total, 2)}${NBSP}kWh</span></div>` +
-          parts.map(([id, v]) => line(id === 'other' ? t('overview.other') : names.value[id] ?? id.slice(0, 6), kwh(v, 2))).join('') +
-          (price.value != null ? `<div style="margin-top:4px">${line(t('overview.cost'), eurFromWh(r.total, price.value))}</div>` : '') + '</div>'
+        const parts = keys.filter((k) => !hidden.value.has(k.key) && (r.by[k.key] ?? 0) > 0).sort((a, b) => (r.by[b.key] ?? 0) - (r.by[a.key] ?? 0))
+        const sum = parts.reduce((s, k) => s + (r.by[k.key] ?? 0), 0)
+        const line = (dot: string, a: string, b: string) => `<div style="display:flex;justify-content:space-between;gap:16px"><span>${dot}${a}</span><b style="font-weight:500">${b}</b></div>`
+        const dot = (k: string) => `<span style="display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:6px;background:${th.token(tokenOf(k))}"></span>`
+        return `<div style="min-width:200px"><div style="display:flex;justify-content:space-between;gap:16px;margin-bottom:4px;font-weight:600"><span>${dayLong(r.day)}${i === last ? ` (${t('overview.soFar')})` : ''}</span><span>${kwh(sum, 2)}${NBSP}kWh</span></div>` +
+          parts.map((k) => line(dot(k.key), k.label, kwh(r.by[k.key] ?? 0, 2))).join('') +
+          (price.value != null ? `<div style="margin-top:4px">${line('', t('overview.cost'), eurFromWh(sum, price.value))}</div>` : '') + '</div>'
       } },
     xAxis: { type: 'category', data: rows.map((r) => r.day), axisTick: { show: false }, axisLine: { show: false },
       axisLabel: { color: caption, fontSize: 11, hideOverlap: true, formatter: (v: string, i: number) => (i === last ? t('overview.todayShort') : dayShort(v)) } },
     yAxis: { type: 'value', position: 'right', splitNumber: 3, splitLine: th.base.axisCommon.splitLine,
       axisLabel: { color: caption, fontSize: 11, formatter: (v: number) => `${num(v)}${NBSP}kWh` } },
-    series: [{
-      type: 'bar', barMaxWidth: 22, barCategoryGap: '38%',
-      data: rows.map((r, i) => ({ value: +(r.total / 1000).toFixed(3), itemStyle: { color: th.token(i === last ? 'primary' : 'bar'), borderRadius: [2, 2, 0, 0] } })),
-      emphasis: { itemStyle: { color: th.token('bar-hover') } },
-      markLine: { silent: true, symbol: 'none', lineStyle: { color: caption, type: [3, 3], width: 1 },
-        label: { position: 'insideEndTop', color: th.token('muted-foreground'), fontSize: 11, formatter: `Ø ${num(avg, 1)}` },
-        data: [{ yAxis: +avg.toFixed(2) }] },
-    }],
+    series: keys.map((k, si) => ({
+      type: 'bar' as const, name: k.label, stack: 'day', barMaxWidth: 22, barCategoryGap: '34%',
+      itemStyle: { color: th.token(tokenOf(k.key)), borderColor: th.token('background'), borderWidth: rows.length > 60 ? 0 : 1 },
+      emphasis: { focus: 'series' as const },
+      data: rows.map((r, i) => ({ value: +((r.by[k.key] ?? 0) / 1000).toFixed(3), itemStyle: { opacity: i === last ? 0.55 : 1 } })),
+      ...(si === 0 ? { markLine: { silent: true, symbol: 'none', lineStyle: { color: caption, type: [3, 3] as number[], width: 1 },
+        label: { position: 'insideEndTop' as const, color: th.token('muted-foreground'), fontSize: 11, formatter: `Ø ${num(avg, 1)}` },
+        data: [{ yAxis: +avg.toFixed(2) }] } } : {}),
+    })),
   }
 })
 const dailySummary = computed(() => {
@@ -102,6 +122,65 @@ const dailySummary = computed(() => {
   if (price.value != null) parts[0] += `, ${eurFromWh(k.value.range_wh, price.value)}`
   if (k.value.peak_day) parts.push(t('overview.peak', { day: dayLong(k.value.peak_day.day), value: kwh(k.value.peak_day.total) }))
   return parts.join(' · ')
+})
+
+/* today: quarter hours per device (stacked), yesterday's total dashed for comparison */
+const midnight = (offset = 0) => { const x = new Date(); x.setHours(0, 0, 0, 0); x.setDate(x.getDate() + offset); return x }
+const todayQ = useQuery({
+  queryKey: ['today-split'],
+  queryFn: async () => {
+    const t0 = midnight(), y0 = midnight(-1)
+    const enc = (x: Date) => encodeURIComponent(x.toISOString())
+    const [today, yest] = await Promise.all([
+      api.get<{ step_s: number; series: Record<string, [number, number, number, number, number | null, number, number][]> }>(`/api/series?from=${enc(t0)}&bucket=15m&split=true`),
+      api.get<SeriesResponse>(`/api/series?from=${enc(y0)}&to=${enc(t0)}&bucket=15m`),
+    ])
+    return { t0: t0.getTime() / 1000, today, yest }
+  },
+  refetchInterval: 60_000,
+})
+const todayOption = computed<EChartsOption>(() => {
+  const th = theme.value, data = todayQ.data.value, caption = th.token('caption')
+  if (!data) return {}
+  const t0 = data.t0, keys = seriesKeys.value.map((k) => k.key)
+  const times = [...new Set(Object.values(data.today.series).flat().map((p) => p[0]))].sort((a, b) => a - b)
+  const per = (key: string) => {
+    const ids = key === 'other' ? Object.keys(data.today.series).filter((id) => !keys.includes(id)) : [key]
+    return times.map((tt) => [tt * 1000, +ids.reduce((s, id) => s + (data.today.series[id]?.find((p) => p[0] === tt)?.[1] ?? 0), 0).toFixed(1)])
+  }
+  const yest = (data.yest.points ?? []).map((p) => [(p[0] + 86400) * 1000, p[1]])
+  return {
+    ...th.base,
+    legend: { show: false, selected: { ...legendSelected.value, [t('overview.yesterday')]: true } },
+    grid: { left: 0, right: 0, top: 8, bottom: 0, containLabel: true },
+    tooltip: { ...th.base.tooltip, trigger: 'axis', axisPointer: { type: 'line', lineStyle: { color: caption } },
+      formatter: (ps: unknown) => {
+        const arr = (ps as { value: [number, number]; seriesName: string; color: string }[]).filter((p) => p.value[1] > 0.05)
+        if (!arr.length) return ''
+        const head = time(arr[0]!.value[0] / 1000)
+        return `<b>${head}</b><br>` + arr.map((p) => `<span style="display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:6px;background:${p.color}"></span>${p.seriesName}: ${watts(p.value[1])}`).join('<br>')
+      } },
+    xAxis: { type: 'time', min: t0 * 1000, max: (t0 + 86400) * 1000, axisLine: { show: false }, axisTick: { show: false }, splitLine: { show: false },
+      axisLabel: { color: caption, fontSize: 11, formatter: (v: number) => time(v / 1000) } },
+    yAxis: { type: 'value', position: 'right', splitNumber: 3, splitLine: th.base.axisCommon.splitLine,
+      axisLabel: { color: caption, fontSize: 11, formatter: (v: number) => `${num(v)}${NBSP}W` } },
+    series: [
+      ...seriesKeys.value.map((k) => ({
+        type: 'line' as const, name: k.label, stack: 'w', step: 'end' as const, showSymbol: false, data: per(k.key),
+        lineStyle: { width: 0 }, areaStyle: { color: th.token(tokenOf(k.key)), opacity: 0.9 }, emphasis: { focus: 'series' as const },
+      })),
+      { type: 'line' as const, name: t('overview.yesterday'), data: yest, step: 'end' as const, showSymbol: false, z: 5,
+        lineStyle: { color: th.token('muted-foreground'), width: 1, type: [3, 3] as number[] } },
+    ],
+  }
+})
+const todaySummary = computed(() => {
+  const data = todayQ.data.value
+  if (!data) return ''
+  const wh = Object.values(data.today.series).flat().reduce((s, p) => s + (p[5] ?? 0), 0)
+  const cut = Date.now() / 1000 - 86400
+  const ywh = (data.yest.points ?? []).filter((p) => p[0] < cut).reduce((s, p) => s + (p[5] ?? 0), 0)
+  return t('overview.todayLine', { kwh: kwh(wh, 2), eur: price.value != null ? `, ${eurFromWh(wh, price.value)}` : '', y: kwh(ywh, 2) })
 })
 
 /* months: one tone, the running month lighter with its forecast outlined */
@@ -157,7 +236,7 @@ const heatOption = computed<EChartsOption>(() => {
     yAxis: { type: 'category', data: dayNames, inverse: true, axisTick: { show: false }, axisLine: { show: false }, axisLabel: { color: caption, fontSize: 11 } },
     visualMap: { show: false, dimension: 2, min: 0, max, inRange: { color: [0, 0.25, 0.5, 0.75, 1].map((s) => mix(from, to, s * 0.85)) } },
     series: [{ type: 'heatmap', itemStyle: { borderColor: th.token('background'), borderWidth: 2, borderRadius: 2 },
-      data: cells.map((c) => [c.hour, c.dow - 1, Math.round(c.wh / Math.max(1, c.n))]) }],
+      data: cells.map((c) => [c.hour, c.dow - 1, Math.round(c.wh)]) }],   // wh is already the average per hour
   }
 })
 
@@ -169,9 +248,17 @@ const rows = computed(() => {
   return [...list]
     .map((x) => {
       const w = liveW(x.id), m = meta.value[x.id]
-      return { ...x, w, on: m?.status?.device_on !== false, room: m?.room ?? null, share: total ? x.range_wh / total : 0, bar: (w ?? 0) / maxW }
+      return { ...x, w, css: slotVar(x.slot), on: m?.status?.device_on !== false, room: m?.room ?? null, share: total ? x.range_wh / total : 0, bar: (w ?? 0) / maxW }
     })
     .sort((a, b) => Number(b.on) - Number(a.on) || (b.w ?? -1) - (a.w ?? -1) || b.range_wh - a.range_wh)
+})
+const shares = computed(() => {
+  const list = d.value?.devices ?? [], total = list.reduce((s, x) => s + x.range_wh, 0)
+  if (!total) return []
+  const colored = list.filter((x) => x.slot).map((x) => ({ key: x.id, label: x.name, css: slotVar(x.slot), wh: x.range_wh }))
+  const rest = list.filter((x) => !x.slot).reduce((s, x) => s + x.range_wh, 0)
+  return [...colored, ...(rest > 0 ? [{ key: 'other', label: t('overview.other'), css: slotVar(0), wh: rest }] : [])]
+    .map((x) => ({ ...x, share: x.wh / total })).filter((x) => x.share >= 0.005)
 })
 const totals = computed(() => ({
   w: nowW.value, today: k.value?.today_wh ?? 0, range: rows.value.reduce((s, x) => s + x.range_wh, 0),
@@ -240,12 +327,40 @@ const open = (id: string) => router.push(`/devices/${id}`)
       </div>
     </section>
 
+    <Section :title="t('overview.today')" :summary="todaySummary">
+      <ul class="mb-4 flex flex-wrap gap-1" :aria-label="t('overview.legend')">
+        <li v-for="k in seriesKeys" :key="k.key">
+          <button type="button" class="flex h-7 items-center gap-2 rounded-md px-2 text-sm transition-[color,background-color,opacity] hover:bg-muted"
+                  :class="hidden.has(k.key) ? 'text-caption opacity-60' : 'text-muted-foreground'" :aria-pressed="!hidden.has(k.key)" @click="toggle(k.key)">
+            <span class="size-2.5 rounded-sm" :style="{ background: hidden.has(k.key) ? 'var(--border-strong)' : k.css }" aria-hidden="true" />{{ k.label }}
+          </button>
+        </li>
+        <li class="ml-1 flex h-7 items-center gap-2 px-2 text-sm text-caption">
+          <span class="w-3 border-t border-dashed border-muted-foreground" aria-hidden="true" />{{ t('overview.yesterday') }}
+        </li>
+      </ul>
+      <div v-if="!todayQ.data.value" class="h-[200px] animate-pulse rounded-md bg-muted" />
+      <EChart v-else :option="todayOption" :height="200" :label="t('overview.today')" />
+    </Section>
+
     <Section :title="t('overview.daily')" :summary="dailySummary">
-      <div v-if="!d" class="h-[220px] animate-pulse rounded-md bg-muted" />
-      <EChart v-else :option="dailyOption" :height="220" :label="t('overview.daily')" />
+      <div v-if="!d" class="h-[240px] animate-pulse rounded-md bg-muted" />
+      <EChart v-else :option="dailyOption" :height="240" :label="t('overview.daily')" />
     </Section>
 
     <Section :title="t('overview.devices')" :summary="t('overview.devicesSort')">
+      <div v-if="shares.length" class="mb-6">
+        <div class="flex h-2 gap-0.5 overflow-hidden rounded-full" role="img" :aria-label="t('overview.shareLabel', { days: d?.range.days })">
+          <span v-for="x in shares" :key="x.key" class="h-full first:rounded-l-full last:rounded-r-full" :style="{ background: x.css, flexGrow: x.share, flexBasis: 0 }" :title="`${x.label}: ${pct(x.share)}`" />
+        </div>
+        <ul class="mt-3 flex flex-wrap gap-x-5 gap-y-1.5 text-sm">
+          <li v-for="x in shares" :key="x.key" class="flex items-center gap-2">
+            <span class="size-2.5 rounded-sm" :style="{ background: x.css }" aria-hidden="true" />
+            <span class="text-muted-foreground">{{ x.label }}</span>
+            <span class="font-medium tabular">{{ pct(x.share) }}</span>
+          </li>
+        </ul>
+      </div>
       <div class="overflow-x-auto">
         <table class="w-full text-sm">
           <thead>
@@ -265,8 +380,8 @@ const open = (id: string) => router.push(`/devices/${id}`)
                 @click="open(x.id)" @keydown.enter="open(x.id)">
               <td class="max-w-64 pr-3">
                 <div class="flex min-w-0 items-center gap-2.5">
-                  <span class="size-1.5 shrink-0 rounded-full" :class="x.on ? 'bg-good-fill' : 'bg-border-strong'" aria-hidden="true" />
-                  <span class="truncate font-medium">{{ x.name }}</span>
+                  <span class="size-2.5 shrink-0 rounded-sm" :style="{ background: x.css }" aria-hidden="true" />
+                  <span class="truncate font-medium" :class="x.on ? '' : 'text-muted-foreground'">{{ x.name }}</span>
                   <span v-if="x.room" class="hidden truncate text-xs text-caption sm:inline">{{ x.room }}</span>
                 </div>
               </td>

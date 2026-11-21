@@ -13,6 +13,8 @@ import Segmented from '@/components/Segmented.vue'
 import StateMessage from '@/components/StateMessage.vue'
 import { Button } from '@/components/ui/button'
 import { useChartTheme } from '@/composables/useChartTheme'
+import { slotColor } from '@/lib/charts'
+import { slotVar } from '@/lib/colors'
 import { useLive } from '@/composables/useLive'
 import { api } from '@/lib/api'
 import { dayLong, money, NBSP, num, time, watts } from '@/lib/format'
@@ -68,10 +70,41 @@ function lineOption(points: [number, number][], opts: { from: number; to: number
   }
 }
 
-const liveOption = computed(() => {
-  const to = live.now.value
-  return lineOption(windowPts.value.map((p) => [p.t, p.w]), { from: to - win.value, to, seconds: win.value <= 60 })
+/* live: stacked area per coloured device, the rest as "other"; the stack top is the total */
+const liveOption = computed<EChartsOption>(() => {
+  const th = theme.value, to = live.now.value, from = to - win.value, caption = th.token('caption')
+  const times = windowPts.value.map((p) => p.t)
+  const colored = devices.value.filter((x) => x.slot)
+  const coloredIds = new Set(colored.map((x) => x.id))
+  const lookup = (id: string) => new Map((live.perDevice.value[id] ?? []).map((p) => [p.t, p.w]))
+  const maps = Object.fromEntries(Object.keys(live.perDevice.value).map((id) => [id, lookup(id)]))
+  const near = (m: Map<number, number> | undefined, tt: number) => m?.get(tt) ?? 0
+  const otherIds = Object.keys(maps).filter((id) => !coloredIds.has(id))
+  const series = [
+    ...colored.map((x) => ({ name: x.name, color: slotColor(x.slot), data: times.map((tt) => [tt * 1000, near(maps[x.id], tt)]) })),
+    { name: t('overview.other'), color: slotColor(0), data: times.map((tt) => [tt * 1000, otherIds.reduce((a, id) => a + near(maps[id], tt), 0)]) },
+  ]
+  return {
+    ...th.base,
+    grid: { left: 0, right: 0, top: 8, bottom: 0, containLabel: true },
+    tooltip: { ...th.base.tooltip, trigger: 'axis', axisPointer: { type: 'line', lineStyle: { color: caption } },
+      formatter: (ps: unknown) => {
+        const arr = (ps as { value: [number, number]; seriesName: string; color: string }[])
+        const tot = arr.reduce((a, p) => a + p.value[1], 0)
+        const rows = arr.filter((p) => p.value[1] >= 0.5).sort((a, b) => b.value[1] - a.value[1])
+        return `<b>${time(arr[0]!.value[0] / 1000, win.value <= 60)} · ${watts(tot)}</b><br>` + rows.map((p) =>
+          `<span style="display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:6px;background:${p.color}"></span>${p.seriesName}: ${watts(p.value[1])}`).join('<br>')
+      } },
+    xAxis: { type: 'time', min: from * 1000, max: to * 1000, axisLine: { show: false }, axisTick: { show: false }, splitLine: { show: false },
+      axisLabel: { color: caption, fontSize: 11, hideOverlap: true, formatter: (v: number) => time(v / 1000, win.value <= 60) } },
+    yAxis: { type: 'value', min: 0, position: 'right', splitNumber: 3, splitLine: th.base.axisCommon.splitLine,
+      axisLabel: { color: caption, fontSize: 11, formatter: (v: number) => (v >= 1000 ? `${num(v / 1000, 1)}${NBSP}kW` : `${num(v)}${NBSP}W`) } },
+    series: series.map((x) => ({ type: 'line' as const, name: x.name, stack: 'w', showSymbol: false, data: x.data, color: x.color,
+      lineStyle: { width: 0 }, areaStyle: { color: x.color, opacity: 0.88 }, emphasis: { focus: 'series' as const } })),
+  }
 })
+const liveLegend = computed(() => [...devices.value.filter((x) => x.slot).map((x) => ({ key: x.id, label: x.name, css: slotVar(x.slot) })),
+  { key: 'other', label: t('overview.other'), css: slotVar(0) }])
 
 // status per device: idle (0 W), standby (below 1.6 x base load, min 3 W), active
 function status(w: number | undefined, base: number | null) {
@@ -175,7 +208,10 @@ const perHour = (w: number | null | undefined) => (w == null || price.value == n
             <dd class="mt-1 font-semibold tabular">{{ watts(span.lo) }} – {{ watts(span.hi) }}</dd></div>
         </dl>
       </div>
-      <div class="mb-3 mt-8 flex items-center justify-end">
+      <div class="mb-3 mt-8 flex flex-wrap items-center justify-between gap-3">
+        <ul class="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground">
+          <li v-for="k in liveLegend" :key="k.key" class="flex items-center gap-2"><span class="size-2.5 rounded-sm" :style="{ background: k.css }" aria-hidden="true" />{{ k.label }}</li>
+        </ul>
         <Segmented v-model="win" :options="winOptions" :label="t('live.windowLabel')" />
       </div>
       <EChart :option="liveOption" :height="240" :label="t('live.total')" />
@@ -200,7 +236,7 @@ const perHour = (w: number | null | undefined) => (w == null || price.value == n
             <tr v-for="c in drawing" :key="c.id" class="h-12 border-t border-border">
               <td class="max-w-64 pr-3">
                 <RouterLink :to="`/devices/${c.id}`" class="flex min-w-0 items-center gap-2.5 font-medium hover:underline">
-                  <span class="size-1.5 shrink-0 rounded-full bg-good-fill" aria-hidden="true" />
+                  <span class="size-2.5 shrink-0 rounded-sm" :style="{ background: slotVar(c.slot) }" aria-hidden="true" />
                   <span class="truncate" :title="c.name">{{ c.name }}</span>
                   <span v-if="c.st === 'standby'" class="shrink-0 text-xs font-normal text-caption">{{ t('live.status.standby') }}</span>
                 </RouterLink>
@@ -210,7 +246,7 @@ const perHour = (w: number | null | undefined) => (w == null || price.value == n
               <td class="hidden px-3 sm:table-cell">
                 <span class="flex items-center justify-end gap-2.5">
                   <span class="h-1 w-16 overflow-hidden rounded-full bg-border" aria-hidden="true">
-                    <span class="block h-full origin-left rounded-full bg-primary transition-transform duration-(--ease-settle-ms) ease-settle" :style="{ transform: `scaleX(${c.share.toFixed(3)})` }" />
+                    <span class="block h-full origin-left rounded-full transition-transform duration-(--ease-settle-ms) ease-settle" :style="{ background: slotVar(c.slot), transform: `scaleX(${c.share.toFixed(3)})` }" />
                   </span>
                   <span class="w-10 text-right text-muted-foreground tabular">{{ num(c.share * 100) }}{{ NBSP }}%</span>
                 </span>

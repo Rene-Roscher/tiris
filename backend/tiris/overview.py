@@ -17,6 +17,20 @@ from .db import pool
 COLOR_SLOTS = 6          # the top 6 devices get their own colour, the rest is "other"
 
 
+def slot_for_rank(i: int) -> int:
+    return i + 1 if i < COLOR_SLOTS else 0
+
+
+def color_slots(con) -> dict[str, int]:
+    """Colour slot per device, the same ranking as the overview (energy of the last 90 days)."""
+    rows = con.execute(
+        """SELECT d.device_id FROM devices d
+           WHERE NOT d.retired AND NOT EXISTS (SELECT 1 FROM devices c WHERE c.parent_id = d.device_id)
+           ORDER BY COALESCE((SELECT SUM(wh) FROM energy_daily x WHERE x.device_id = d.device_id
+                              AND x.day >= CURRENT_DATE - 90), 0) DESC, COALESCE(d.nickname, d.device_id)""").fetchall()
+    return {r[0]: slot_for_rank(i) for i, r in enumerate(rows)}
+
+
 def median(xs: list[float]) -> float | None:
     return statistics.median(xs) if xs else None
 
@@ -40,7 +54,7 @@ def overview(days: int = Query(30, ge=7, le=3650), device: str | None = None, pr
         # Colour follows the device (rank by the last 90 days), never the current filter or range
         devices = [{"id": r[0], "name": r[1].strip(), "model": r[2], "ip": r[3],
                     "last_seen": r[4].isoformat() if r[4] else None,
-                    "slot": i + 1 if i < COLOR_SLOTS else 0} for i, r in enumerate(devs)]
+                    "slot": slot_for_rank(i)} for i, r in enumerate(devs)]
         ids = [d["id"] for d in devices]
         if device and device not in ids:
             raise HTTPException(404, "unknown device")

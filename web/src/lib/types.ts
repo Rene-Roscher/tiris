@@ -53,6 +53,8 @@ export interface Device {
   id: string; name: string; model: string; ip: string | null; mac: string | null; hw_ver: string | null
   first_seen: string | null; last_seen: string | null; retired: boolean
   room: string | null; category: string | null; note: string | null; protected: boolean
+  /** colour slot 1..6 (top consumers of the last 90 days), 0 = other */
+  slot: number
   status: DeviceStatus; firmware: Firmware | null
 }
 export interface ScheduleRule {

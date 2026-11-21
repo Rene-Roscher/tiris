@@ -9,6 +9,7 @@ import { Switch } from '@/components/ui/switch'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { confirm } from '@/composables/useConfirm'
 import { api } from '@/lib/api'
+import { slotVar } from '@/lib/colors'
 import { duration, watts } from '@/lib/format'
 import { notify } from '@/lib/toast'
 import type { Device } from '@/lib/types'
@@ -90,6 +91,7 @@ const mmss = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, 
                  class="h-7 min-w-56 rounded-md border border-ring bg-background px-2 font-medium"
                  @keydown.enter.prevent="saveName" @keydown.esc="editing = false" @blur="saveName" />
           <template v-else>
+            <span class="size-2.5 shrink-0 rounded-sm" :style="{ background: slotVar(d.slot) }" aria-hidden="true" />
             <RouterLink :to="`/devices/${d.id}`" class="font-medium hover:underline" :class="on || !reachable ? '' : 'text-muted-foreground'">{{ d.name }}</RouterLink>
             <button type="button" class="grid size-6 place-items-center rounded-md text-caption opacity-0 transition-[opacity,color,background-color] hover:bg-muted hover:text-foreground focus-visible:opacity-100 group-hover/row:opacity-100"
                     :aria-label="t('devices.renameHint')" :title="t('devices.renameHint')" @click="startEdit">

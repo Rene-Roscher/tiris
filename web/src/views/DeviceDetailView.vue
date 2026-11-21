@@ -10,9 +10,12 @@ import Section from '@/components/Section.vue'
 import Segmented from '@/components/Segmented.vue'
 import StateMessage from '@/components/StateMessage.vue'
 import { useChartTheme } from '@/composables/useChartTheme'
+import { useDevices } from '@/composables/useDevices'
+import { mix, slotColor } from '@/lib/charts'
+import { slotVar } from '@/lib/colors'
 import { api } from '@/lib/api'
-import { dayShort, duration, kwh, money, NBSP, num, pct, time, watts } from '@/lib/format'
-import type { SeriesResponse } from '@/lib/types'
+import { dayShort, duration, monthLong, monthShort, kwh, money, NBSP, num, pct, time, watts } from '@/lib/format'
+import type { Overview, SeriesResponse } from '@/lib/types'
 
 interface Analysis {
   device: { id: string; name: string; model: string; room: string | null; category: string | null; protected: boolean }
@@ -51,10 +54,12 @@ const s = useQuery({
 })
 const d = computed(() => a.data.value)
 const price = computed(() => d.value?.price ?? null)
+const { slot: slotOfDevice } = useDevices()
+const devSlot = computed(() => slotOfDevice(id.value))
 const perDay = computed(() => (d.value?.cycles ? d.value.cycles.count / (hours.value / 24) : null))
 
 function timeLine(points: [number, number][], band: [number, number][] | null, unit: 'W' | 'V', min?: number, max?: number, from?: number): EChartsOption {
-  const th = theme.value, c = th.token('primary'), caption = th.token('caption'), long = range.value.to - (from ?? range.value.from) > 48 * 3600
+  const th = theme.value, c = devSlot.value ? slotColor(devSlot.value) : th.token('primary'), caption = th.token('caption'), long = range.value.to - (from ?? range.value.from) > 48 * 3600
   const fmt = (v: number) => (unit === 'W' ? watts(v) : `${num(v, 1)}${NBSP}V`)
   return {
     ...th.base,
@@ -107,6 +112,74 @@ const dataFrom = computed(() => {
   const span = range.value.to - range.value.from
   return first - range.value.from > span * 0.2 ? first - (s.data.value?.step_s ?? 60) : null
 })
+/* the device's own long view: months, typical day, week profile (overview API filtered to this device) */
+const ov = useQuery({
+  queryKey: computed(() => ['overview-device', id.value]),
+  queryFn: () => api.get<Overview>(`/api/overview?days=90&device=${encodeURIComponent(id.value)}`),
+  staleTime: 5 * 60_000,
+})
+const devColorHex = computed(() => { void theme.value; return devSlot.value ? slotColor(devSlot.value) : theme.value.token('primary') })
+const monthsOption = computed<EChartsOption>(() => {
+  const th = theme.value, ms = ov.data.value?.months ?? [], c = devColorHex.value, caption = th.token('caption')
+  return {
+    ...th.base,
+    grid: { left: 0, right: 0, top: 8, bottom: 0, containLabel: true },
+    tooltip: { ...th.base.tooltip, trigger: 'axis', axisPointer: { type: 'none' }, formatter: (ps: unknown) => {
+      const m = ms[(ps as { dataIndex: number }[])[0]!.dataIndex]!
+      return [`<b>${monthLong(m.month)}</b>`, `${kwh(m.wh)}${NBSP}kWh${m.partial ? ` (${t('overview.soFar')})` : ''}`, ...(price.value != null ? [money(m.wh / 1000 * price.value)] : [])].join('<br>')
+    } },
+    xAxis: { type: 'category', data: ms.map((m) => m.month), axisTick: { show: false }, axisLine: { show: false }, axisLabel: { color: caption, fontSize: 11, formatter: (v: string) => monthShort(v) } },
+    yAxis: { type: 'value', position: 'right', splitNumber: 3, splitLine: th.base.axisCommon.splitLine, axisLabel: { color: caption, fontSize: 11, formatter: (v: number) => `${num(v, v < 10 ? 1 : 0)}${NBSP}kWh` } },
+    series: [{ type: 'bar', barMaxWidth: 22, data: ms.map((m) => ({ value: +(m.wh / 1000).toFixed(2), itemStyle: { color: c, opacity: m.partial ? 0.55 : 1, borderRadius: [2, 2, 0, 0] } })) }],
+  }
+})
+const dayProfile = computed(() => {
+  const cells = ov.data.value?.heat ?? []
+  return Array.from({ length: 24 }, (_, h) => {
+    const xs = cells.filter((c) => c.hour === h)
+    return xs.length ? xs.reduce((a, c) => a + c.wh, 0) / xs.length : 0
+  })
+})
+const profileOption = computed<EChartsOption>(() => {
+  const th = theme.value, c = devColorHex.value, caption = th.token('caption'), v = dayProfile.value
+  return {
+    ...th.base,
+    grid: { left: 0, right: 0, top: 8, bottom: 0, containLabel: true },
+    tooltip: { ...th.base.tooltip, trigger: 'axis', axisPointer: { type: 'none' }, formatter: (ps: unknown) => {
+      const h = (ps as { dataIndex: number }[])[0]!.dataIndex
+      return `<b>${String(h).padStart(2, '0')}–${String(h + 1).padStart(2, '0')}</b><br>Ø ${num(v[h]!)}${NBSP}Wh`
+    } },
+    xAxis: { type: 'category', data: v.map((_, h) => h), axisTick: { show: false }, axisLine: { show: false }, axisLabel: { color: caption, fontSize: 11, interval: 5 } },
+    yAxis: { type: 'value', position: 'right', splitNumber: 3, splitLine: th.base.axisCommon.splitLine, axisLabel: { color: caption, fontSize: 11, formatter: (x: number) => `${num(x)}${NBSP}Wh` } },
+    series: [{ type: 'bar', barCategoryGap: '20%', data: v.map((x) => +x.toFixed(1)), itemStyle: { color: c, borderRadius: [2, 2, 0, 0] } }],
+  }
+})
+const weekOption = computed<EChartsOption>(() => {
+  const th = theme.value, cells = ov.data.value?.heat ?? [], caption = th.token('caption')
+  const dows = new Intl.DateTimeFormat(undefined, { weekday: 'short' })
+  const names = [1, 2, 3, 4, 5, 6, 7].map((i) => dows.format(new Date(2024, 0, i)))
+  const sorted = cells.map((c) => c.wh).sort((a, b) => a - b)
+  const max = Math.max(1, sorted[Math.floor(sorted.length * 0.95)] ?? 1)
+  return {
+    ...th.base,
+    grid: { left: 0, right: 0, top: 0, bottom: 0, containLabel: true },
+    tooltip: { ...th.base.tooltip, formatter: (p: unknown) => {
+      const x = (p as { value: [number, number, number] }).value
+      return `<b>${names[x[1]]} ${String(x[0]).padStart(2, '0')}–${String(x[0] + 1).padStart(2, '0')}</b><br>Ø ${num(x[2])}${NBSP}Wh`
+    } },
+    xAxis: { type: 'category', data: Array.from({ length: 24 }, (_, i) => i), axisTick: { show: false }, axisLine: { show: false }, axisLabel: { color: caption, fontSize: 11, interval: 5 } },
+    yAxis: { type: 'category', data: names, inverse: true, axisTick: { show: false }, axisLine: { show: false }, axisLabel: { color: caption, fontSize: 11 } },
+    visualMap: { show: false, dimension: 2, min: 0, max, inRange: { color: [0, 0.25, 0.5, 0.75, 1].map((k) => mix(th.token('heat-0'), devColorHex.value, k * 0.9)) } },
+    series: [{ type: 'heatmap', itemStyle: { borderColor: th.token('background'), borderWidth: 2, borderRadius: 2 }, data: cells.map((x) => [x.hour, x.dow - 1, Math.round(x.wh)]) }],
+  }
+})
+const monthsSummary = computed(() => {
+  const full = (ov.data.value?.months ?? []).filter((m) => !m.partial).slice(-12)
+  if (!full.length) return ''
+  const sum = full.reduce((a, m) => a + m.wh, 0)
+  return t('overview.last12', { kwh: kwh(sum, 0), eur: price.value != null ? `, ${money(sum / 1000 * price.value, 0)}` : '' })
+})
+
 const powerNote = computed(() => [
   dataFrom.value ? t('detail.since', { time: `${dayShort(new Date(dataFrom.value * 1000).toISOString())} ${time(dataFrom.value)}` }) : '',
   yCap.value.clipped ? t('detail.clipped', { max: watts(yCap.value.max), top: watts(yCap.value.top) }) : '',
@@ -138,7 +211,7 @@ const dailyOption = computed<EChartsOption>(() => {
     yAxis: { type: 'value', position: 'right', splitNumber: 3, splitLine: th.base.axisCommon.splitLine,
       axisLabel: { color: th.token('caption'), fontSize: 11, formatter: (v: number) => `${num(v, v < 1 ? 1 : 0)}${NBSP}kWh` } },
     series: [{ type: 'bar', barMaxWidth: 18, emphasis: { itemStyle: { color: th.token('bar-hover') } },
-      data: rows.map((r, i) => ({ value: +(r.wh / 1000).toFixed(3), itemStyle: { color: th.token(i === rows.length - 1 ? 'primary' : 'bar'), borderRadius: [2, 2, 0, 0] } })) }],
+      data: rows.map((r, i) => ({ value: +(r.wh / 1000).toFixed(3), itemStyle: { color: devSlot.value ? slotColor(devSlot.value) : th.token('primary'), opacity: i === rows.length - 1 ? 0.55 : 1, borderRadius: [2, 2, 0, 0] } })) }],
   }
 })
 </script>
@@ -149,7 +222,7 @@ const dailyOption = computed<EChartsOption>(() => {
   </RouterLink>
   <div class="mb-7 flex flex-wrap items-end justify-between gap-3">
     <div class="min-w-0">
-      <h1 class="text-lg font-semibold">{{ d?.device.name ?? '…' }}</h1>
+      <h1 class="flex items-center gap-2.5 text-lg font-semibold"><span class="size-3 rounded-sm" :style="{ background: slotVar(devSlot) }" aria-hidden="true" />{{ d?.device.name ?? '…' }}</h1>
       <p v-if="d" class="mt-0.5 text-sm text-caption">{{ [d.device.model, d.device.room, d.device.category].filter(Boolean).join(' · ') }}</p>
     </div>
     <Segmented :model-value="hours" :options="hourOptions" :label="t('detail.rangeLabel')" @update:model-value="(v) => setHours(Number(v))" />
@@ -205,6 +278,22 @@ const dailyOption = computed<EChartsOption>(() => {
       <Section :title="t('detail.daily')" :summary="t('detail.dailySub')" class="border-t border-border lg:border-t-0">
         <div v-if="!d" class="h-[200px] animate-pulse rounded-md bg-muted" />
         <EChart v-else :option="dailyOption" :height="200" :label="t('detail.daily')" />
+      </Section>
+    </div>
+
+    <Section :title="t('overview.months')" :summary="monthsSummary">
+      <div v-if="!ov.data.value" class="h-[180px] animate-pulse rounded-md bg-muted" />
+      <EChart v-else :option="monthsOption" :height="180" :label="t('overview.months')" />
+    </Section>
+
+    <div class="grid gap-x-12 lg:grid-cols-2">
+      <Section :title="t('detail.typicalDay')" :summary="t('overview.profileDays', { n: ov.data.value?.heat_days ?? 0 })">
+        <div v-if="!ov.data.value" class="h-[180px] animate-pulse rounded-md bg-muted" />
+        <EChart v-else :option="profileOption" :height="180" :label="t('detail.typicalDay')" />
+      </Section>
+      <Section :title="t('overview.profile')" :summary="t('detail.weekSub')" class="border-t border-border lg:border-t-0">
+        <div v-if="!ov.data.value" class="h-[180px] animate-pulse rounded-md bg-muted" />
+        <EChart v-else :option="weekOption" :height="180" :label="t('overview.profile')" />
       </Section>
     </div>
   </div>

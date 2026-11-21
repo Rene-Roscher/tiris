@@ -8,6 +8,7 @@ import { RouterLink, useRoute } from 'vue-router'
 import Logo from '@/components/Logo.vue'
 import { useLive } from '@/composables/useLive'
 import { api } from '@/lib/api'
+import { slotVar } from '@/lib/colors'
 import { ago, watts } from '@/lib/format'
 import type { Device, Run } from '@/lib/types'
 
@@ -31,7 +32,7 @@ const total = computed(() => snapshot.value?.total_w ?? null)
 const drawing = computed(() => {
   const live = snapshot.value?.devices ?? {}
   return active.value
-    .map((d) => ({ id: d.id, name: d.name, on: d.status?.device_on !== false, w: live[d.id]?.w ?? null }))
+    .map((d) => ({ id: d.id, name: d.name, slot: d.slot, on: d.status?.device_on !== false, w: live[d.id]?.w ?? null }))
     .sort((a, b) => Number(b.on) - Number(a.on) || (b.w ?? -1) - (a.w ?? -1))
     .slice(0, 5)
 })
@@ -72,8 +73,8 @@ const navClass = (on: boolean) => on
       <ul class="flex flex-col gap-px text-sm">
         <li v-for="d in drawing" :key="d.id">
           <RouterLink :to="`/devices/${d.id}`" @click="$emit('navigate')"
-                      class="grid h-7 grid-cols-[6px_minmax(0,1fr)_auto] items-center gap-2.5 rounded-md px-2 text-muted-foreground transition-[color,background-color] hover:bg-side-hover hover:text-foreground">
-            <span class="size-1.5 rounded-full" :class="d.on ? 'bg-good-fill' : 'bg-border-strong'" aria-hidden="true" />
+                      class="grid h-7 grid-cols-[8px_minmax(0,1fr)_auto] items-center gap-2.5 rounded-md px-2 text-muted-foreground transition-[color,background-color] hover:bg-side-hover hover:text-foreground">
+            <span class="size-2 rounded-sm" :style="{ background: slotVar(d.slot) }" aria-hidden="true" />
             <span class="truncate" :title="d.name">{{ d.name }}</span>
             <span class="text-xs tabular" :class="d.on && (d.w ?? 0) >= 0.5 ? 'font-medium text-foreground' : 'text-caption'">
               {{ !d.on ? t('app.off') : d.w == null ? '–' : watts(d.w) }}

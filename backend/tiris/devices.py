@@ -13,6 +13,7 @@ import time
 from fastapi import HTTPException
 from psycopg_pool import ConnectionPool
 
+from .overview import color_slots
 from .plugs import PlugPool
 
 log = logging.getLogger("tiris.devices")
@@ -167,6 +168,7 @@ class DeviceService:
                 """SELECT device_id, COALESCE(nickname, device_id), model, ip, mac, hw_ver, first_seen, last_seen,
                           retired, room, category, note, protected
                    FROM devices WHERE parent_id IS NULL ORDER BY retired, nickname""").fetchall()
+            slots = color_slots(con)
         active = [r for r in rows if r[3] and not r[8]]
         statuses = await asyncio.gather(*(self.status(r[3]) for r in active))
         by_id = dict(zip((r[0] for r in active), statuses, strict=True))
@@ -180,6 +182,7 @@ class DeviceService:
                 "id": r[0], "name": r[1].strip(), "model": r[2], "ip": ip, "mac": r[4], "hw_ver": r[5],
                 "first_seen": r[6].isoformat() if r[6] else None, "last_seen": r[7].isoformat() if r[7] else None,
                 "retired": r[8], "room": r[9], "category": r[10], "note": r[11], "protected": r[12],
+                "slot": slots.get(r[0], 0),
                 "status": by_id.get(r[0], {"reachable": False}),
                 "firmware": fw or ({"pending": True} if ip in self._fw_queue else None),
             })
