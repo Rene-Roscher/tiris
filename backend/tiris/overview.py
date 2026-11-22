@@ -35,7 +35,9 @@ def median(xs: list[float]) -> float | None:
     return statistics.median(xs) if xs else None
 
 
-def overview(days: int = Query(30, ge=7, le=3650), device: str | None = None, price: float | None = None):
+def overview(days: int = Query(30, ge=7, le=3650), device: str | None = None, price: float | None = None,
+             whole: bool = False):
+    """Overview data. `whole`: the whole history, totals from the monthly values (daily ones reach back unevenly)."""
     now = datetime.now(settings().tz)
     today = now.date()
     with pool().connection() as con:
@@ -74,10 +76,8 @@ def overview(days: int = Query(30, ge=7, le=3650), device: str | None = None, pr
                 "SELECT device_id, ts, wh FROM energy_hourly WHERE ts >= now() - INTERVAL '35 days'"):
             hourly[did][ts.astimezone(settings().tz)] += wh
 
-        monthly = defaultdict(dict)
-        m_start = (today.replace(day=1) - timedelta(days=370)).replace(day=1)
-        for did, month, wh in con.execute(
-                "SELECT device_id, month, wh FROM energy_monthly WHERE month >= %s", (m_start,)):
+        monthly = defaultdict(dict)   # the whole history: one row per device and month, small
+        for did, month, wh in con.execute("SELECT device_id, month, wh FROM energy_monthly"):
             monthly[did][month] = wh
 
         last_run = con.execute(
@@ -149,16 +149,34 @@ def overview(days: int = Query(30, ge=7, le=3650), device: str | None = None, pr
         row["total"] = sum(row["by"].values())
         series.append(row)
 
-    # ---- months (13 including the current one)
+    # ---- months: 13 including the current one, or the whole history; split like the daily series
+    first_month = min((m for d in sel for m, wh in monthly[d].items() if wh > 0), default=month_start)
     months = []
     m = month_start
-    for _ in range(13):
-        months.append({"month": m.isoformat(), "wh": sum(monthly[d].get(m, 0) for d in sel),
-                       "partial": m == month_start})
+    while True:
+        by = {k: monthly[k].get(m, 0) for k in keys}
+        if rest:
+            by["other"] = sum(monthly[d].get(m, 0) for d in rest)
+        months.append({"month": m.isoformat(), "wh": sum(by.values()), "by": by, "partial": m == month_start})
+        if (not whole and len(months) >= 13) or m <= first_month:
+            break
         m = (m - timedelta(days=1)).replace(day=1)
     months.reverse()
     while months and months[0]["wh"] == 0:
         months.pop(0)
+    # Busy plugs keep about 13 months, rarely used ones up to 22: the oldest months then hold only a few plugs.
+    # In the whole-history view the range starts at the first month with at least a fifth of a typical month.
+    partial_before = None
+    if whole and len(months) > 3:
+        typical = median([x["wh"] for x in months if not x["partial"] and x["wh"] > 0]) or 0
+        cut = 0
+        while cut < len(months) - 1 and months[cut]["wh"] < typical * 0.2:
+            cut += 1
+        if cut:
+            partial_before = {"until": months[cut]["month"], "wh": sum(x["wh"] for x in months[:cut]),
+                              "from": months[0]["month"]}
+            months = months[cut:]
+            first_month = date.fromisoformat(months[0]["month"])
 
     # ---- load profile: mean Wh per weekday x hour (all hours of the last 35 days)
     cells: dict[tuple[int, int], list[int]] = defaultdict(list)
@@ -168,6 +186,17 @@ def overview(days: int = Query(30, ge=7, le=3650), device: str | None = None, pr
     heat = [{"dow": k[0], "hour": k[1], "wh": round(sum(v) / len(v), 1), "n": len(v)} for k, v in cells.items()]
     hourly_days = len({ts.date() for ts in tot_h if ts.date() < today})
 
+    # ---- whole history: totals from the monthly values (daily values reach back unevenly per plug)
+    if whole:
+        range_info = {"start": first_month.isoformat(), "end": today.isoformat(),
+                      "days": (today - first_month).days + 1, "all": True, "partial_before": partial_before}
+        range_wh_of = {d["id"]: sum(wh for m, wh in monthly[d["id"]].items() if m >= first_month) for d in devices}
+        range_total = sum(range_wh_of[d] for d in sel)
+    else:
+        range_info = {"start": range_start.isoformat(), "end": today.isoformat(), "days": len(series), "all": False}
+        range_wh_of = {d["id"]: span(range_start, today, [d["id"]]) for d in devices}
+        range_total = sum(r["total"] for r in series)
+
     # ---- devices
     rows = []
     for d in devices:
@@ -175,7 +204,7 @@ def overview(days: int = Query(30, ge=7, le=3650), device: str | None = None, pr
         spark = [daily[did].get(today - timedelta(days=29 - i), 0) for i in range(30)]
         rows.append({
             **d,
-            "range_wh": span(range_start, today, [did]),
+            "range_wh": range_wh_of[did],
             "last30_wh": span(today - timedelta(days=30), yesterday, [did]),
             "mtd_wh": span(month_start, today, [did]),
             "today_wh": day_sum(today, [did]),
@@ -189,7 +218,7 @@ def overview(days: int = Query(30, ge=7, le=3650), device: str | None = None, pr
         "last_run": {"at": last_run[0].isoformat(), "status": last_run[1]} if last_run else None,
         "last_ok": last_ok.isoformat() if last_ok else None,
         "selected": device,
-        "range": {"start": range_start.isoformat(), "end": today.isoformat(), "days": len(series)},
+        "range": range_info,
         "kpi": {
             "today_wh": today_wh,
             "yesterday_same_time_wh": yday_same,
@@ -203,10 +232,12 @@ def overview(days: int = Query(30, ge=7, le=3650), device: str | None = None, pr
             "forecast_year_wh": round(last30 / 30 * 365),
             "base_w": base_w,
             "days_in_month": dim,
-            "range_wh": sum(r["total"] for r in series),
-            "peak_day": max(series, key=lambda r: r["total"]) if series else None,
+            "range_wh": range_total,
+            "peak_day": None if whole else (max(series, key=lambda r: r["total"]) if series else None),
+            "peak_month": (max((x for x in months if not x["partial"]), key=lambda x: x["wh"], default=None)
+                           if whole else None),
         },
-        "daily": series,
+        "daily": [] if whole else series,
         "series_keys": keys + (["other"] if rest else []),
         "months": months,
         "heat": heat,

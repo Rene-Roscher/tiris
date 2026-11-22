@@ -1,7 +1,7 @@
 /** Response shapes of the tiris API (backend: tiris/overview.py, api/*.py). Energy in Wh, power in W. */
 
 export interface DailyRow { day: string; by: Record<string, number>; total: number }
-export interface MonthRow { month: string; wh: number; partial: boolean }
+export interface MonthRow { month: string; wh: number; partial: boolean; by?: Record<string, number> }
 export interface HeatCell { dow: number; hour: number; wh: number; n: number }
 
 export interface OverviewDevice {
@@ -14,13 +14,13 @@ export interface Overview {
   price: number | null
   last_run: { at: string; status: 'ok' | 'partial' | 'failed' } | null
   selected: string | null
-  range: { start: string; end: string; days: number }
+  range: { start: string; end: string; days: number; all?: boolean; partial_before?: { until: string; from: string; wh: number } | null }
   kpi: {
     today_wh: number; yesterday_same_time_wh: number | null; yesterday_wh: number
     last7_wh: number; prev7_wh: number; last30_wh: number
     mtd_wh: number; mtd_complete_wh: number; prev_month_same_wh: number | null; prev_month_wh: number
     forecast_month_wh: number; forecast_year_wh: number; base_w: number | null; days_in_month: number
-    range_wh: number; peak_day: DailyRow | null
+    range_wh: number; peak_day: DailyRow | null; peak_month?: MonthRow | null
   }
   daily: DailyRow[]
   series_keys: string[]

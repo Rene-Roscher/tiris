@@ -49,6 +49,7 @@ export const dayShort = (s: string) => dtf({ day: 'numeric', month: 'numeric' })
 export const dayLong = (s: string) => dtf({ weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' }).format(parseDay(s))
 export const dateMedium = (s: string) => dtf({ day: 'numeric', month: 'short', year: 'numeric' }).format(parseDay(s))
 export const monthShort = (s: string) => dtf({ month: 'short' }).format(parseDay(s))
+export const monthYear = (s: string) => dtf({ month: 'short', year: '2-digit' }).format(parseDay(s))
 export const monthLong = (s: string) => dtf({ month: 'long', year: 'numeric' }).format(parseDay(s))
 export const time = (t: number | Date, seconds = false) =>
   dtf({ hour: '2-digit', minute: '2-digit', ...(seconds ? { second: '2-digit' } : {}) }).format(t instanceof Date ? t : new Date(t * 1000))

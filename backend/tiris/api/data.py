@@ -26,8 +26,9 @@ def health():
 
 
 @router.get("/overview")
-def get_overview(days: int = Query(30, ge=7, le=3650), device: str | None = None):
-    return overview(days=days, device=device, price=current_price())
+def get_overview(days: int = Query(30, ge=7, le=3650), device: str | None = None,
+                 whole: bool = Query(False, alias="all")):
+    return overview(days=days, device=device, price=current_price(), whole=whole)
 
 
 def current_price() -> float | None:
