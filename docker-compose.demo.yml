@@ -1,0 +1,29 @@
+# Try tiris without plugs: made-up devices with 14 months of history and live values.
+#   docker compose -f docker-compose.demo.yml up --build
+# then open http://localhost:8080 (another port: TIRIS_HTTP_PORT=8095 docker compose -f docker-compose.demo.yml up)
+name: tiris-demo
+
+services:
+  db:
+    image: timescale/timescaledb:2.24.0-pg18
+    environment:
+      POSTGRES_USER: tiris
+      POSTGRES_PASSWORD: tiris
+      POSTGRES_DB: tiris
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tiris -d tiris"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
+  tiris:
+    build: .
+    image: tiris:local
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      TIRIS_DEMO: "true"
+      TIRIS_DATABASE_URL: postgresql://tiris:tiris@db:5432/tiris
+    ports:
+      - "${TIRIS_HTTP_PORT:-8080}:8080"
