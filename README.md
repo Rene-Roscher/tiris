@@ -160,6 +160,13 @@ cd web && pnpm install && pnpm dev        # proxies /api to TIRIS_API (default h
 
 Design decisions are in [docs/PLAN.md](docs/PLAN.md).
 
+## How it was built
+
+tiris was built agentically: Rene Roscher steered and reviewed, [Claude Code](https://claude.com/claude-code)
+(Claude Opus) designed, wrote, tested and measured it, in roughly two to three hours of sessions. The decisions
+are in [docs/PLAN.md](docs/PLAN.md), the reasons for each change in the commit messages. Numbers in this README
+(plug memory, soak test, motion) were measured, not estimated, unless they say so.
+
 ## Credits
 
 tiris stands on these projects:
