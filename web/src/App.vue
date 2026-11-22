@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { Menu, Search } from '@lucide/vue'
-import { onMounted, ref } from 'vue'
+import { useEventListener, useMediaQuery, useStorage } from '@vueuse/core'
+import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { RouterView } from 'vue-router'
+import { RouterView, useRoute } from 'vue-router'
 import { Toaster } from 'vue-sonner'
 import AppSidebar from '@/components/AppSidebar.vue'
 import CommandPalette from '@/components/CommandPalette.vue'
@@ -18,6 +19,20 @@ import { paletteOpen } from '@/lib/palette'
 const { t } = useI18n()
 useTheme()
 const mobileOpen = ref(false)
+const route = useRoute()
+const bare = computed(() => route.meta.bare === true)   // the wall view has no shell
+
+// Sidebar: 'auto' collapses to the icon rail below 1280 px (tablets), an explicit choice is remembered.
+const sidebarPref = useStorage<'auto' | 'open' | 'rail'>('tiris.sidebar', 'auto')
+const wide = useMediaQuery('(min-width: 1280px)')
+const collapsed = computed(() => (sidebarPref.value === 'auto' ? !wide.value : sidebarPref.value === 'rail'))
+const toggleSidebar = () => { sidebarPref.value = collapsed.value ? 'open' : 'rail' }
+useEventListener(window, 'keydown', (e: KeyboardEvent) => {
+  const el = e.target as HTMLElement | null
+  if (e.key !== '[' || e.metaKey || e.ctrlKey || e.altKey || el?.closest('input, textarea, select, [contenteditable="true"]')) return
+  e.preventDefault()
+  toggleSidebar()
+})
 // Login only when the server asks for it (TIRIS_PASSWORD set); API calls answering 401 raise 'tiris:login'.
 const needLogin = ref(false)
 onMounted(async () => {
@@ -33,9 +48,10 @@ const loggedIn = () => window.location.reload()
 <template>
   <LoginScreen v-if="needLogin" @done="loggedIn" />
   <TooltipProvider v-else :delay-duration="400" :skip-delay-duration="200">
-    <div class="md:grid md:min-h-dvh md:grid-cols-[228px_minmax(0,1fr)]">
+    <RouterView v-if="bare" />
+    <div v-else class="md:grid md:min-h-dvh" :class="collapsed ? 'md:grid-cols-[60px_minmax(0,1fr)]' : 'md:grid-cols-[236px_minmax(0,1fr)]'">
       <aside class="sticky top-0 hidden h-dvh md:block">
-        <AppSidebar />
+        <AppSidebar :collapsed="collapsed" @toggle="toggleSidebar" />
       </aside>
       <div class="min-w-0 md:py-2 md:pr-2">
         <div class="flex min-h-dvh flex-col bg-background md:min-h-[calc(100dvh-16px)] md:rounded-xl md:border md:border-border md:shadow-xs">
@@ -60,7 +76,7 @@ const loggedIn = () => window.location.reload()
       <SheetContent side="left" class="w-64 bg-canvas p-0">
         <SheetTitle class="sr-only">tiris</SheetTitle>
         <SheetDescription class="sr-only">{{ t('app.tagline') }}</SheetDescription>
-        <AppSidebar @navigate="mobileOpen = false" />
+        <AppSidebar :collapsible="false" @navigate="mobileOpen = false" />
       </SheetContent>
     </Sheet>
     <CommandPalette v-model:open="paletteOpen" />
