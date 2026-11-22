@@ -64,6 +64,7 @@ class LivePoller:
     # ------------------------------------------------------------------ lifecycle
     def start(self) -> None:
         self._load_last_energy()
+        self._load_recent()
         self._task = asyncio.create_task(self._run(), name="tiris-live")
 
     async def stop(self) -> None:
@@ -92,6 +93,29 @@ class LivePoller:
             self.devices = con.execute(
                 "SELECT device_id, ip FROM devices WHERE NOT retired AND ip IS NOT NULL AND parent_id IS NULL "
                 "ORDER BY device_id").fetchall()
+
+    def _load_recent(self) -> None:
+        """Refill the live window from the stored samples, so the live curve is not empty after a restart.
+        The total per poll step sums the latest value of every device (forward fill)."""
+        try:
+            with self.db.connection() as con:
+                rows = con.execute(
+                    "SELECT device_id, extract(epoch FROM ts)::float8, w FROM power_samples "
+                    "WHERE ts >= now() - make_interval(secs => %s) ORDER BY ts", (BUFFER_S,)).fetchall()
+        except Exception:
+            log.exception("could not load recent samples")
+            return
+        last: dict[str, float] = {}
+        step = None
+        for did, ts, w in rows:
+            self.history.setdefault(did, deque(maxlen=self.total_history.maxlen)).append((round(ts, 1), float(w)))
+            last[did] = float(w)
+            b = round(ts / self.interval) * self.interval
+            if step is not None and b != step:
+                self.total_history.append((round(step, 1), round(sum(last.values()), 2)))
+            step = b
+        if step is not None:
+            self.total_history.append((round(step, 1), round(sum(last.values()), 2)))
 
     def _load_last_energy(self) -> None:
         """Continue the counter deltas across a restart of tiris (short restarts lose no energy)."""
