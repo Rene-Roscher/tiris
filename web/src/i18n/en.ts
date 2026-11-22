@@ -1,6 +1,6 @@
 export default {
-  nav: { overview: 'Overview', live: 'Live', devices: 'Devices', costs: 'Costs', settings: 'Settings' },
-  app: { nav: 'Navigation', drawing: 'Drawing now', off: 'off', allDevices: 'All {n} devices', notifications: 'Notifications',
+  nav: { wall: 'Wall view', overview: 'Overview', live: 'Live', devices: 'Devices', costs: 'Costs', settings: 'Settings' },
+  app: { liveNow: 'Now', nothingDrawing: 'No device is drawing power right now.', moreDrawing: '+{n} more', expand: 'Expand sidebar', collapse: 'Collapse sidebar', nav: 'Navigation', drawing: 'Drawing now', off: 'off', allDevices: 'All {n} devices', notifications: 'Notifications',
     tagline: 'Energy at a glance',
     lastRun: 'Last fetch {when}',
     runFailed: 'Last fetch had errors',
@@ -29,6 +29,7 @@ export default {
   },
   events: { uncovered: 'No minute values before {time}', steady: 'On all the time, no separate runs: {list}',  title: 'What ran when', dayLabel: 'Day', peak: 'peak', none: 'No minute values for this day yet.', idle: 'No consumption: {names}', biggest: 'Biggest runs' },
   palette: { ctrl: 'Ctrl', title: 'Commands', search: 'Search …', placeholder: 'Search pages, devices, actions …', hint: 'Arrow keys to choose, Enter to run. Type a device name to switch it.', empty: 'Nothing found', pages: 'Pages', devices: 'Devices', switch: 'Switch', actions: 'Actions', turnOn: 'Turn on {name}', turnOff: 'Turn off {name}' },
+  wall: { vsYesterday: 'vs. yesterday',  back: 'Back', fullscreen: 'Full screen', exitFullscreen: 'Exit full screen', awake: 'Screen stays on', mayDim: 'Screen may turn off', wakeHint: 'The wall view keeps the screen awake while it is open.', month: 'Month so far', forecast: 'Month forecast', bill: 'Yearly bill', backPayment: 'Back payment expected', refund: 'Refund expected', balanced: 'Installments fit', noBill: 'Add a meter and tariff under Costs' },
   overview: { partialBefore: 'From {from} until {until} only some plugs kept monthly values ({kwh} kWh); those months are left out.', allMonths: 'Energy per month', sinceLine: 'since {since} {kwh} kWh{eur}', peakMonth: 'peak {month} with {value} kWh', since: 'since {since}', allPriceNote: 'Euros at today\'s energy price; what you actually paid is under Costs.', yesterday: 'Yesterday', legend: 'Show or hide devices', todayLine: '{kwh} kWh so far{eur} · yesterday by now {y} kWh', shareLabel: 'Share of energy, {days} days', rangeLabel: 'Range', cost: 'Cost', todayShort: 'today', peak: 'peak {day} with {value} kWh', last12: 'last 12 months {kwh} kWh{eur}', baseLoadLine: 'Base load {w} W around the clock, {eur} a year', baseLoadLineKwh: 'Base load {w} W around the clock, {kwh} kWh a year', vsMonthSameTime: 'vs. {month} at the same point', forecastOf: '{month} forecast', yearLine: 'Over a year {kwh} kWh{eur}', devicesSort: 'sorted by current power', sumPlugs: 'All plugs',
     title: 'Overview',
     allDevices: 'All devices',

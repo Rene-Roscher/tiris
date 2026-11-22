@@ -17,7 +17,7 @@ interface Ev {
   devices: { id: string; name: string; threshold_w: number; wh: number; on_s: number; base_w: number; runs: Run[]; drawing: [number, number][] }[]
 }
 
-const props = defineProps<{ day: string }>()
+const props = defineProps<{ day: string; compact?: boolean }>()
 const { t } = useI18n()
 const { color } = useDevices()
 const q = useQuery({
@@ -88,7 +88,7 @@ const steady = (d: Ev['devices'][number]) => !d.runs.length && d.base_w >= 1
     <p v-if="rows.some(steady)" class="mt-1 text-sm text-caption">{{ t('events.steady', { list: rows.filter(steady).map((d) => `${d.name} ~${watts(d.base_w)}`).join(', ') }) }}</p>
     <p v-if="idle.length" class="mt-1 text-sm text-caption">{{ t('events.idle', { names: idle.map((d) => d.name).join(', ') }) }}</p>
 
-    <div v-if="top.length" class="mt-6">
+    <div v-if="top.length && !compact" class="mt-6">
       <h3 class="mb-1 text-xs font-medium text-caption">{{ t('events.biggest') }}</h3>
       <ul class="divide-y divide-border border-y border-border text-sm">
         <li v-for="r in top" :key="`${r.id}-${r.start}`" class="grid h-10 grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-4 sm:grid-cols-[minmax(0,1fr)_7rem_5rem_5rem_4.5rem]">

@@ -17,6 +17,7 @@ import Segmented from '@/components/Segmented.vue'
 import StateMessage from '@/components/StateMessage.vue'
 import { useChartTheme } from '@/composables/useChartTheme'
 import { useLive } from '@/composables/useLive'
+import { useToday } from '@/composables/useToday'
 import { useTween } from '@/composables/useTween'
 import { ApiError, api } from '@/lib/api'
 import { animated, mix } from '@/lib/charts'
@@ -72,7 +73,8 @@ const point = (label: string, on: boolean) => {
   for (const c of [todayChart.value, dailyChart.value, monthsChart.value, allChart.value]) (on ? c?.highlight : c?.downplay)?.(label)
 }
 const runDay = ref<'today' | 'yesterday'>('today')
-const runDayIso = computed(() => { const x = new Date(); if (runDay.value === 'yesterday') x.setDate(x.getDate() - 1); return x.toLocaleDateString('sv-SE') })
+const today = useToday()   // rolls over at midnight when the page stays open
+const runDayIso = computed(() => { const x = new Date(`${today.value}T12:00`); if (runDay.value === 'yesterday') x.setDate(x.getDate() - 1); return x.toLocaleDateString('sv-SE') })
 const runDayOptions = computed(() => [{ value: 'today' as const, label: t('common.today') }, { value: 'yesterday' as const, label: t('common.yesterday') }])
 function toggle(key: string) {
   const h = new Set(hidden.value)
@@ -148,7 +150,7 @@ const dailySummary = computed(() => {
 /* today: quarter hours per device (stacked), yesterday's total dashed for comparison */
 const midnight = (offset = 0) => { const x = new Date(); x.setHours(0, 0, 0, 0); x.setDate(x.getDate() + offset); return x }
 const todayQ = useQuery({
-  queryKey: ['today-split'],
+  queryKey: computed(() => ['today-split', today.value]),
   queryFn: async () => {
     const t0 = midnight(), y0 = midnight(-1)
     const enc = (x: Date) => encodeURIComponent(x.toISOString())

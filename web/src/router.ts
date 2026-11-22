@@ -9,6 +9,7 @@ export const router = createRouter({
     { path: '/devices/:id', component: () => import('@/views/DeviceDetailView.vue') },
     { path: '/costs', component: () => import('@/views/CostsView.vue') },
     { path: '/settings', component: () => import('@/views/SettingsView.vue') },
+    { path: '/wall', component: () => import('@/views/WallView.vue'), meta: { bare: true } },
     { path: '/:pathMatch(.*)*', redirect: '/' },
   ],
   scrollBehavior: () => ({ top: 0 }),

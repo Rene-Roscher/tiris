@@ -1,6 +1,6 @@
 export default {
-  nav: { overview: 'Übersicht', live: 'Live', devices: 'Geräte', costs: 'Kosten', settings: 'Einstellungen' },
-  app: { nav: 'Navigation', drawing: 'Zieht gerade', off: 'aus', allDevices: 'Alle {n} Geräte', notifications: 'Benachrichtigungen',
+  nav: { wall: 'Wandansicht', overview: 'Übersicht', live: 'Live', devices: 'Geräte', costs: 'Kosten', settings: 'Einstellungen' },
+  app: { liveNow: 'Jetzt', nothingDrawing: 'Gerade zieht kein Gerät Strom.', moreDrawing: '+{n} weitere', expand: 'Seitenleiste ausklappen', collapse: 'Seitenleiste einklappen', nav: 'Navigation', drawing: 'Zieht gerade', off: 'aus', allDevices: 'Alle {n} Geräte', notifications: 'Benachrichtigungen',
     tagline: 'Energie im Blick',
     lastRun: 'Letzter Abruf {when}',
     runFailed: 'Letzter Abruf mit Fehlern',
@@ -29,6 +29,7 @@ export default {
   },
   events: { uncovered: 'Keine Minutenwerte vor {time}', steady: 'Durchgehend an, ohne einzelne Läufe: {list}',  title: 'Wann lief was', dayLabel: 'Tag', peak: 'Spitze', none: 'Für diesen Tag gibt es noch keine Minutenwerte.', idle: 'Ohne Verbrauch: {names}', biggest: 'Größte Läufe' },
   palette: { ctrl: 'Strg', title: 'Befehle', search: 'Suchen …', placeholder: 'Seite, Gerät oder Aktion suchen …', hint: 'Pfeiltasten zum Wählen, Enter zum Ausführen. Tippe einen Gerätenamen, um es zu schalten.', empty: 'Nichts gefunden', pages: 'Seiten', devices: 'Geräte', switch: 'Schalten', actions: 'Aktionen', turnOn: '{name} einschalten', turnOff: '{name} ausschalten' },
+  wall: { vsYesterday: 'ggü. gestern',  back: 'Zurück', fullscreen: 'Vollbild', exitFullscreen: 'Vollbild beenden', awake: 'Bildschirm bleibt an', mayDim: 'Bildschirm kann ausgehen', wakeHint: 'Die Wandansicht hält den Bildschirm wach, solange sie offen ist.', month: 'Monat bisher', forecast: 'Prognose Monat', bill: 'Jahresabrechnung', backPayment: 'Nachzahlung erwartet', refund: 'Guthaben erwartet', balanced: 'Abschläge passen', noBill: 'Zähler und Tarif unter Kosten anlegen' },
   overview: { partialBefore: 'Von {from} bis vor {until} haben nur einzelne Plugs Monatswerte ({kwh} kWh); diese Monate zählen nicht mit.', allMonths: 'Monatsverbrauch', sinceLine: 'seit {since} {kwh} kWh{eur}', peakMonth: 'Spitze {month} mit {value} kWh', since: 'seit {since}', allPriceNote: 'Euro zum heutigen Arbeitspreis gerechnet; was du tatsächlich bezahlt hast, steht unter Kosten.', yesterday: 'Gestern', legend: 'Geräte ein- und ausblenden', todayLine: '{kwh} kWh bisher{eur} · gestern bis jetzt {y} kWh', shareLabel: 'Anteile am Verbrauch, {days} Tage', rangeLabel: 'Zeitraum', cost: 'Kosten', todayShort: 'heute', peak: 'Spitze {day} mit {value} kWh', last12: 'letzte 12 Monate {kwh} kWh{eur}', baseLoadLine: 'Grundlast {w} W rund um die Uhr, {eur} im Jahr', baseLoadLineKwh: 'Grundlast {w} W rund um die Uhr, {kwh} kWh im Jahr', vsMonthSameTime: 'gegenüber {month} zur gleichen Zeit', forecastOf: 'Prognose {month}', yearLine: 'Aufs Jahr gerechnet {kwh} kWh{eur}', devicesSort: 'sortiert nach aktueller Leistung', sumPlugs: 'Summe der Plugs',
     title: 'Übersicht',
     allDevices: 'Alle Geräte',
