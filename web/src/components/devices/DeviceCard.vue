@@ -25,7 +25,9 @@ const open = ref(false)
 const tab = ref('settings')
 const busy = ref(false)
 const d = computed(() => props.device)
-const on = computed(() => !!d.value.status.device_on)
+// optimistic: the switch moves at once and goes back if the plug refuses
+const optimistic = ref<boolean | null>(null)
+const on = computed(() => optimistic.value ?? !!d.value.status.device_on)
 const reachable = computed(() => d.value.status.reachable)
 
 async function run<T>(fn: () => Promise<T>, ok?: string) {
@@ -43,14 +45,17 @@ async function run<T>(fn: () => Promise<T>, ok?: string) {
 }
 
 async function setPower(v: boolean) {
+  if (busy.value) return
   if (!v) {
     const load = (props.liveW ?? 0) > 5 ? ` ${t('devices.confirmOffLoad', { watts: watts(props.liveW) })}` : ''
     const ok = await confirm({ title: t('devices.confirmOffTitle', { name: d.value.name }), body: t('devices.confirmOffBody') + load,
       action: t('devices.off'), danger: true })
     if (!ok) return
   }
+  optimistic.value = v
   await run(() => api.post(`/api/devices/${d.value.id}/power`, { on: v }),
     t(v ? 'devices.switchedOn' : 'devices.switchedOff', { name: d.value.name }))
+  optimistic.value = null   // the refreshed status (or the old one after an error) takes over
 }
 
 // rename inline
@@ -83,7 +88,7 @@ const mmss = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, 
 <template>
   <li class="group/row">
     <div class="flex flex-wrap items-center gap-x-4 gap-y-2 py-3">
-      <Switch :model-value="on" :disabled="busy || !reachable || (d.protected && on)"
+      <Switch :model-value="on" :disabled="!reachable || (d.protected && on)" :aria-busy="busy" :class="busy ? 'pointer-events-none' : ''"
               :aria-label="d.name" @update:model-value="(v: boolean) => setPower(v)" />
       <div class="min-w-[12rem] flex-1">
         <div class="flex flex-wrap items-center gap-2">

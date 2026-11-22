@@ -2,10 +2,13 @@
 /** Sidebar on the canvas: brand with live total, navigation, the devices drawing power right now, settings. */
 import { Activity, LayoutDashboard, Plug, Search, Settings, Wallet } from '@lucide/vue'
 import { useQuery } from '@tanstack/vue-query'
-import { computed } from 'vue'
+import { useResizeObserver } from '@vueuse/core'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { RouterLink, useRoute } from 'vue-router'
+import LiveDot from '@/components/LiveDot.vue'
 import Logo from '@/components/Logo.vue'
+import { useTween } from '@/composables/useTween'
 import { useLive } from '@/composables/useLive'
 import { api } from '@/lib/api'
 import { slotVar } from '@/lib/colors'
@@ -29,6 +32,7 @@ const items = computed(() => [
   { to: '/costs', label: t('nav.costs'), icon: Wallet },
 ])
 const total = computed(() => snapshot.value?.total_w ?? null)
+const totalTween = useTween(total)
 // the five devices drawing the most right now
 const drawing = computed(() => {
   const live = snapshot.value?.devices ?? {}
@@ -37,6 +41,18 @@ const drawing = computed(() => {
     .sort((a, b) => Number(b.on) - Number(a.on) || (b.w ?? -1) - (a.w ?? -1))
     .slice(0, 5)
 })
+// the active surface slides between the main entries (a transition: a quick second click starts where it is)
+const navBox = ref<HTMLElement | null>(null)
+const marker = ref<{ y: number; h: number } | null>(null)
+const markerReady = ref(false)
+function place() {
+  const el = navBox.value?.querySelector<HTMLElement>('a[data-main][aria-current="page"]')
+  marker.value = el ? { y: el.offsetTop, h: el.offsetHeight } : null
+}
+onMounted(async () => { place(); await nextTick(); requestAnimationFrame(() => { markerReady.value = true }) })
+watch(() => route.path, () => nextTick(place))
+useResizeObserver(navBox, place)
+const mainClass = (on: boolean) => (on ? 'text-foreground' : 'text-muted-foreground hover:bg-side-hover hover:text-foreground')
 const navClass = (on: boolean) => on
   ? 'bg-background text-foreground shadow-[0_0_0_1px_var(--border),0_1px_2px_rgb(0_0_0/0.06)]'
   : 'text-muted-foreground hover:bg-side-hover hover:text-foreground'
@@ -50,12 +66,15 @@ const navClass = (on: boolean) => on
       <span class="flex-1" aria-hidden="true" />
       <span v-if="enabled" class="inline-flex h-[22px] items-center gap-1.5 rounded-full bg-side-hover px-2 text-xs font-medium text-muted-foreground"
             :title="connected ? t('app.liveOn') : t('app.liveOff')">
-        <span class="size-1.5 rounded-full" :class="connected ? 'bg-good-fill' : 'bg-caption'" aria-hidden="true" />
-        <span class="tabular text-foreground">{{ total == null ? '–' : watts(total) }}</span>
+        <LiveDot :on="connected" :beat="snapshot?.at" />
+        <span class="tabular text-foreground">{{ totalTween == null ? '–' : watts(totalTween) }}</span>
       </span>
     </div>
 
-    <div class="flex flex-col gap-px">
+    <div ref="navBox" class="relative flex flex-col gap-px">
+      <span v-if="marker" class="pointer-events-none absolute inset-x-0 top-0 rounded-md bg-background shadow-[0_0_0_1px_var(--border),0_1px_2px_rgb(0_0_0/0.06)]" aria-hidden="true"
+            :class="markerReady ? 'transition-[translate] duration-(--ease-settle-ms) ease-settle' : ''"
+            :style="{ translate: `0 ${marker.y}px`, height: `${marker.h}px` }" />
       <button type="button" class="mb-2 flex h-8 items-center gap-2.5 rounded-md border border-border bg-background px-2 text-sm text-caption shadow-xs transition-[color,border-color] hover:border-border-strong hover:text-foreground"
               @click="paletteOpen = true; $emit('navigate')">
         <Search class="size-4" aria-hidden="true" />{{ t('palette.search') }}
@@ -64,9 +83,9 @@ const navClass = (on: boolean) => on
       </button>
       <RouterLink
         v-for="i in items" :key="i.to" :to="i.to" @click="$emit('navigate')"
-        :aria-current="isActive(i.to) ? 'page' : undefined"
-        class="group flex h-[30px] items-center gap-2.5 rounded-md px-2 font-medium transition-[color,background-color,box-shadow]"
-        :class="navClass(isActive(i.to))"
+        :aria-current="isActive(i.to) ? 'page' : undefined" data-main
+        class="group relative flex h-[30px] items-center gap-2.5 rounded-md px-2 font-medium transition-[color,background-color]"
+        :class="mainClass(isActive(i.to))"
       >
         <component :is="i.icon" class="size-4" :class="isActive(i.to) ? 'text-foreground' : 'text-caption group-hover:text-foreground'" aria-hidden="true" />
         {{ i.label }}

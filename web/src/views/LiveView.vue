@@ -16,6 +16,8 @@ import { useChartTheme } from '@/composables/useChartTheme'
 import { slotColor } from '@/lib/charts'
 import { slotVar } from '@/lib/colors'
 import { useLive } from '@/composables/useLive'
+import { useTween } from '@/composables/useTween'
+import LiveDot from '@/components/LiveDot.vue'
 import { api } from '@/lib/api'
 import { dayLong, money, NBSP, num, time, watts } from '@/lib/format'
 import type { Overview, SeriesResponse } from '@/lib/types'
@@ -33,6 +35,7 @@ const devices = computed(() => meta.data.value?.devices ?? [])
 
 const snap = computed(() => live.snapshot.value)
 const totalW = computed(() => snap.value?.total_w ?? null)
+const totalTween = useTween(totalW)
 const avgV = computed(() => {
   const v = Object.values(snap.value?.devices ?? {}).map((d) => d.v).filter(Boolean)
   return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null
@@ -181,7 +184,7 @@ const perHour = (w: number | null | undefined) => (w == null || price.value == n
   <div class="mb-7 flex h-9 items-center justify-between gap-3">
     <h1 class="font-semibold">{{ t('live.title') }}</h1>
     <p v-if="live.enabled.value" class="flex items-center gap-2 text-sm text-caption">
-      <span class="size-1.5 shrink-0 rounded-full" :class="live.connected.value ? 'bg-good-fill' : 'bg-caption'" aria-hidden="true" />
+      <LiveDot :on="live.connected.value" :beat="snap?.at" />
       {{ live.connected.value ? t('live.connected', { s: snap?.interval_s ?? 2 }) : t('live.connecting') }}
     </p>
   </div>
@@ -194,7 +197,7 @@ const perHour = (w: number | null | undefined) => (w == null || price.value == n
         <div class="min-w-0">
           <p class="text-xs font-medium text-caption">{{ t('live.total') }}</p>
           <p class="mt-2 text-4xl font-semibold tabular" aria-live="off">
-            {{ totalW == null ? '–' : num(totalW, totalW < 100 ? 1 : 0) }}<span class="ml-1 text-lg font-medium tracking-normal text-caption">W</span>
+            {{ totalTween == null ? '–' : num(totalTween, totalTween < 100 ? 1 : 0) }}<span class="ml-1 text-lg font-medium tracking-normal text-caption">W</span>
           </p>
           <p v-if="price != null && totalW != null" class="mt-2 text-sm text-muted-foreground tabular">
             {{ t('live.perHour', { value: money(perHour(totalW)) }) }} · {{ t('live.perDay', { value: money(perHour(totalW)! * 24) }) }} · {{ t('live.perMonth', { value: money(perHour(totalW)! * 24 * 30.4, 0) }) }}

@@ -15,7 +15,7 @@ import Segmented from '@/components/Segmented.vue'
 import StateMessage from '@/components/StateMessage.vue'
 import { Button } from '@/components/ui/button'
 import { useChartTheme } from '@/composables/useChartTheme'
-import { mix } from '@/lib/charts'
+import { animated, mix } from '@/lib/charts'
 import { useDevices } from '@/composables/useDevices'
 import { api } from '@/lib/api'
 import { dateMedium, money, monthLong, monthShort, NBSP, num } from '@/lib/format'
@@ -75,6 +75,7 @@ const monthsOption = computed<EChartsOption>(() => {
   ] as const
   return {
     ...th.base,
+    ...animated(),
     grid: { left: 0, right: 0, top: 8, bottom: 0, containLabel: true },
     tooltip: { ...th.base.tooltip, trigger: 'axis', axisPointer: { type: 'none' },
       formatter: (ps: unknown) => {

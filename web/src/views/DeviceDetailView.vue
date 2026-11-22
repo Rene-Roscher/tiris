@@ -11,7 +11,7 @@ import Segmented from '@/components/Segmented.vue'
 import StateMessage from '@/components/StateMessage.vue'
 import { useChartTheme } from '@/composables/useChartTheme'
 import { useDevices } from '@/composables/useDevices'
-import { mix, slotColor } from '@/lib/charts'
+import { animated, mix, slotColor } from '@/lib/charts'
 import { slotVar } from '@/lib/colors'
 import { api } from '@/lib/api'
 import { dayShort, duration, monthLong, monthShort, kwh, money, NBSP, num, pct, time, watts } from '@/lib/format'
@@ -123,6 +123,7 @@ const monthsOption = computed<EChartsOption>(() => {
   const th = theme.value, ms = ov.data.value?.months ?? [], c = devColorHex.value, caption = th.token('caption')
   return {
     ...th.base,
+    ...animated(),
     grid: { left: 0, right: 0, top: 8, bottom: 0, containLabel: true },
     tooltip: { ...th.base.tooltip, trigger: 'axis', axisPointer: { type: 'none' }, formatter: (ps: unknown) => {
       const m = ms[(ps as { dataIndex: number }[])[0]!.dataIndex]!
@@ -144,6 +145,7 @@ const profileOption = computed<EChartsOption>(() => {
   const th = theme.value, c = devColorHex.value, caption = th.token('caption'), v = dayProfile.value
   return {
     ...th.base,
+    ...animated(),
     grid: { left: 0, right: 0, top: 8, bottom: 0, containLabel: true },
     tooltip: { ...th.base.tooltip, trigger: 'axis', axisPointer: { type: 'none' }, formatter: (ps: unknown) => {
       const h = (ps as { dataIndex: number }[])[0]!.dataIndex
@@ -200,6 +202,7 @@ const dailyOption = computed<EChartsOption>(() => {
   const th = theme.value, rows = d.value?.daily ?? []
   return {
     ...th.base,
+    ...animated(),
     grid: { left: 0, right: 0, top: 8, bottom: 0, containLabel: true },
     tooltip: { ...th.base.tooltip, trigger: 'axis', axisPointer: { type: 'shadow', shadowStyle: { color: th.token('muted') } },
       formatter: (ps: unknown) => {

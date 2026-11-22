@@ -227,6 +227,13 @@
   on screen; keyframes would restart and jump. Reduced motion: the global rule in @layer base makes them instant.
 */
 @layer components {
+  /* one soft ring per live sample (LiveDot) */
+  @keyframes live-beat {
+    from { box-shadow: 0 0 0 0 color-mix(in oklab, var(--good-fill) 55%, transparent); }
+    to { box-shadow: 0 0 0 5px color-mix(in oklab, var(--good-fill) 0%, transparent); }
+  }
+  .live-ring { animation: live-beat 900ms var(--ease-quick) both; }   /* box-shadow: no layout, no overflow */
+
   .t-fade-enter-active, .t-fade-leave-active { transition: opacity var(--ease-quick-ms) var(--ease-quick); }
   .t-fade-enter-from, .t-fade-leave-to { opacity: 0; }
 

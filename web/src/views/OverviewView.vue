@@ -17,8 +17,9 @@ import Segmented from '@/components/Segmented.vue'
 import StateMessage from '@/components/StateMessage.vue'
 import { useChartTheme } from '@/composables/useChartTheme'
 import { useLive } from '@/composables/useLive'
+import { useTween } from '@/composables/useTween'
 import { ApiError, api } from '@/lib/api'
-import { mix } from '@/lib/charts'
+import { animated, mix } from '@/lib/charts'
 import { slotVar } from '@/lib/colors'
 import { dayLong, dayShort, eurFromWh, kwh, money, monthLong, monthShort, monthYear, NBSP, num, pct, time, watts } from '@/lib/format'
 import type { Device, Overview, SeriesResponse } from '@/lib/types'
@@ -64,6 +65,12 @@ const seriesKeys = computed(() => (d.value?.series_keys ?? []).map((key) => ({
   key, label: key === 'other' ? t('overview.other') : names.value[key] ?? key, css: key === 'other' ? slotVar(0) : slotVar(slots.value[key]),
 })))
 const hidden = ref<Set<string>>(new Set())
+// pointing at a legend entry highlights that device in every chart of the view
+type ChartRef = { highlight: (n: string) => void; downplay: (n: string) => void } | null
+const todayChart = ref<ChartRef>(null), dailyChart = ref<ChartRef>(null), monthsChart = ref<ChartRef>(null), allChart = ref<ChartRef>(null)
+const point = (label: string, on: boolean) => {
+  for (const c of [todayChart.value, dailyChart.value, monthsChart.value, allChart.value]) (on ? c?.highlight : c?.downplay)?.(label)
+}
 const runDay = ref<'today' | 'yesterday'>('today')
 const runDayIso = computed(() => { const x = new Date(); if (runDay.value === 'yesterday') x.setDate(x.getDate() - 1); return x.toLocaleDateString('sv-SE') })
 const runDayOptions = computed(() => [{ value: 'today' as const, label: t('common.today') }, { value: 'yesterday' as const, label: t('common.yesterday') }])
@@ -85,6 +92,7 @@ const monthDelta = computed(() => ratio(k.value?.mtd_complete_wh, k.value?.prev_
 const monthProgress = computed(() => (k.value?.forecast_month_wh ? Math.min(1, k.value.mtd_wh / k.value.forecast_month_wh) : 0))
 
 const nowW = computed(() => live.snapshot.value?.total_w ?? null)
+const nowTween = useTween(nowW)
 const liveW = (id: string) => live.snapshot.value?.devices[id]?.w ?? null
 
 /* daily: one tone, today in the accent, average dashed; the tooltip names the devices */
@@ -94,6 +102,7 @@ const dailyOption = computed<EChartsOption>(() => {
   const caption = th.token('caption'), keys = seriesKeys.value
   return {
     ...th.base,
+    ...animated(),
     legend: { show: false, selected: legendSelected.value },
     grid: { left: 0, right: 0, top: 8, bottom: 0, containLabel: true },
     tooltip: { ...th.base.tooltip, trigger: 'axis', axisPointer: { type: 'shadow', shadowStyle: { color: th.token('muted') } },
@@ -163,6 +172,7 @@ const todayOption = computed<EChartsOption>(() => {
   const yest = (data.yest.points ?? []).map((p) => [(p[0] + 86400) * 1000, p[1]])
   return {
     ...th.base,
+    ...animated(),
     legend: { show: false, selected: { ...legendSelected.value, [t('overview.yesterday')]: true } },
     grid: { left: 0, right: 0, top: 8, bottom: 0, containLabel: true },
     tooltip: { ...th.base.tooltip, trigger: 'axis', axisPointer: { type: 'line', lineStyle: { color: caption } },
@@ -201,6 +211,7 @@ const monthsOption = computed<EChartsOption>(() => {
   const dot = (k: string) => `<span style="display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:6px;background:${th.token(tokenOf(k))}"></span>`
   return {
     ...th.base,
+    ...animated(),
     legend: { show: false, selected: legendSelected.value },
     grid: { left: 0, right: 0, top: 8, bottom: 0, containLabel: true },
     tooltip: { ...th.base.tooltip, trigger: 'axis', axisPointer: { type: 'shadow', shadowStyle: { color: th.token('muted') } },
@@ -305,7 +316,7 @@ const open = (id: string) => router.push(`/devices/${id}`)
       <div class="min-w-0 lg:pr-8">
         <p class="text-xs font-medium text-caption">{{ t('overview.now') }}</p>
         <p class="mt-2 text-4xl font-semibold tabular">
-          {{ nowW == null ? '–' : num(nowW, nowW < 100 ? 1 : 0) }}<span class="ml-1 text-lg font-medium tracking-normal text-caption">W</span>
+          {{ nowTween == null ? '–' : num(nowTween, nowTween < 100 ? 1 : 0) }}<span class="ml-1 text-lg font-medium tracking-normal text-caption">W</span>
         </p>
         <LiveSpark class="mb-2.5 mt-3.5" :points="live.total.value.slice(-300)" />
         <p v-if="nowW != null && price != null" class="text-sm text-muted-foreground">{{ t('overview.atThisLoad', { value: money(nowW * 24 / 1000 * price) }) }}</p>
@@ -351,7 +362,8 @@ const open = (id: string) => router.push(`/devices/${id}`)
       <ul class="mb-4 flex flex-wrap gap-1" :aria-label="t('overview.legend')">
         <li v-for="k in seriesKeys" :key="k.key">
           <button type="button" class="flex h-7 items-center gap-2 rounded-md px-2 text-sm transition-[color,background-color,opacity] hover:bg-muted"
-                  :class="hidden.has(k.key) ? 'text-caption opacity-60' : 'text-muted-foreground'" :aria-pressed="!hidden.has(k.key)" @click="toggle(k.key)">
+                  :class="hidden.has(k.key) ? 'text-caption opacity-60' : 'text-muted-foreground'" :aria-pressed="!hidden.has(k.key)" @click="toggle(k.key)"
+                  @mouseenter="point(k.label, true)" @mouseleave="point(k.label, false)" @focus="point(k.label, true)" @blur="point(k.label, false)">
             <span class="size-2.5 rounded-sm" :style="{ background: hidden.has(k.key) ? 'var(--border-strong)' : k.css }" aria-hidden="true" />{{ k.label }}
           </button>
         </li>
@@ -360,7 +372,7 @@ const open = (id: string) => router.push(`/devices/${id}`)
         </li>
       </ul>
       <div v-if="!todayQ.data.value" class="h-[200px] animate-pulse rounded-md bg-muted" />
-      <EChart v-else :option="todayOption" :height="200" :label="t('overview.today')" />
+      <EChart v-else ref="todayChart" :option="todayOption" :height="200" :label="t('overview.today')" />
     </Section>
 
     <Section :title="t('events.title')">
@@ -371,13 +383,13 @@ const open = (id: string) => router.push(`/devices/${id}`)
     <Section :title="isAll ? t('overview.allMonths') : t('overview.daily')" :summary="dailySummary">
       <div v-if="!d" class="h-[240px] animate-pulse rounded-md bg-muted" />
       <template v-else-if="isAll">
-        <EChart :option="monthsOption" :height="240" :label="t('overview.allMonths')" />
+        <EChart ref="allChart" :option="monthsOption" :height="240" :label="t('overview.allMonths')" />
         <p class="mt-3 text-sm text-caption">
           <template v-if="d.range.partial_before">{{ t('overview.partialBefore', { from: monthYear(d.range.partial_before.from), until: monthYear(d.range.partial_before.until), kwh: kwh(d.range.partial_before.wh, 1) }) }} </template>
           <template v-if="price != null">{{ t('overview.allPriceNote') }}</template>
         </p>
       </template>
-      <EChart v-else :option="dailyOption" :height="240" :label="t('overview.daily')" />
+      <EChart v-else ref="dailyChart" :option="dailyOption" :height="240" :label="t('overview.daily')" />
     </Section>
 
     <Section :title="t('overview.devices')" :summary="t('overview.devicesSort')">
@@ -452,7 +464,7 @@ const open = (id: string) => router.push(`/devices/${id}`)
     <div class="grid gap-x-12" :class="isAll ? '' : 'lg:grid-cols-2'">
       <Section v-if="!isAll" :title="t('overview.months')" :summary="monthsSummary">
         <div v-if="!d" class="h-[180px] animate-pulse rounded-md bg-muted" />
-        <EChart v-else :option="monthsOption" :height="180" :label="t('overview.months')" />
+        <EChart v-else ref="monthsChart" :option="monthsOption" :height="180" :label="t('overview.months')" />
       </Section>
       <Section :title="t('overview.profile')" :summary="t('overview.profileDays', { n: d?.heat_days ?? 0 })" :class="isAll ? '' : 'border-t border-border lg:border-t-0'">
         <div v-if="!d" class="h-[180px] animate-pulse rounded-md bg-muted" />

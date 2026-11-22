@@ -14,6 +14,13 @@ export function token(name: string) {
 /** Category colours per slot (1..6); 0 = "other". Colour follows the device, never its rank in a filter. */
 export const slotColor = (slot: number) => token(slot >= 1 && slot <= 6 ? `chart-${slot}` : 'chart-other')
 
+/** Charts appear without animation; when their data changes (range, legend), they move to the new state in 280 ms.
+    Live charts do not use this: a sliding window that eases every 2 s would never be still. */
+export function animated() {
+  const reduce = typeof matchMedia !== 'undefined' && matchMedia('(prefers-reduced-motion: reduce)').matches
+  return reduce ? { animation: false } : { animation: true, animationDuration: 0, animationDurationUpdate: 280, animationEasingUpdate: 'cubicOut' as const }
+}
+
 export function baseOption() {
   const text = token('muted-foreground'), grid = token('chart-grid'), axis = token('chart-axis')
   return {
