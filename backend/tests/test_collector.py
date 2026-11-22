@@ -18,8 +18,8 @@ from datetime import UTC, date, datetime, time, timedelta
 from types import SimpleNamespace
 from zoneinfo import ZoneInfo
 
-import psycopg
 import pytest
+from conftest import reset_database
 from psycopg_pool import ConnectionPool
 from tapo.requests import EnergyDataInterval
 
@@ -225,8 +225,7 @@ class FakePlugs:
 
 @pytest.fixture
 def pool():
-    with psycopg.connect(URL, autocommit=True) as con:
-        con.execute("DROP SCHEMA public CASCADE; CREATE SCHEMA public;")
+    reset_database(URL)
     db.migrate(URL)
     p = ConnectionPool(URL, min_size=1, max_size=4, open=True)
     yield p
