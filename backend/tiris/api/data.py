@@ -132,6 +132,11 @@ async def scheduler() -> None:
     every = timedelta(minutes=s.collect_interval_min)
     with pool().connection() as con:
         last = con.execute("SELECT MAX(finished_at) FROM runs").fetchone()[0]
+    if state.live is not None:
+        try:   # the first collection must know whether this process owns the plugs
+            await asyncio.wait_for(state.live.lock_decided.wait(), 30)
+        except TimeoutError:
+            pass
     if last is None or datetime.now(last.tzinfo) - last >= every:
         await _guarded_collect()
     while True:
@@ -145,6 +150,10 @@ async def scheduler() -> None:
 
 async def _guarded_collect() -> None:
     if state.collecting or state.plugs is None or not state.plugs.enabled:
+        return
+    if state.live is not None and not state.live.owns_lock:
+        # another tiris process on this database talks to the plugs; a second session would evict its sessions
+        logging.getLogger("tiris.scheduler").warning("skipping collection: another tiris process owns the plugs")
         return
     state.collecting = True
     try:

@@ -12,6 +12,7 @@ import EChart from '@/components/charts/EChart.vue'
 import LiveSpark from '@/components/charts/LiveSpark.vue'
 import Sparkline from '@/components/charts/Sparkline.vue'
 import Section from '@/components/Section.vue'
+import RunTimeline from '@/components/RunTimeline.vue'
 import Segmented from '@/components/Segmented.vue'
 import StateMessage from '@/components/StateMessage.vue'
 import { useChartTheme } from '@/composables/useChartTheme'
@@ -61,6 +62,9 @@ const seriesKeys = computed(() => (d.value?.series_keys ?? []).map((key) => ({
   key, label: key === 'other' ? t('overview.other') : names.value[key] ?? key, css: key === 'other' ? slotVar(0) : slotVar(slots.value[key]),
 })))
 const hidden = ref<Set<string>>(new Set())
+const runDay = ref<'today' | 'yesterday'>('today')
+const runDayIso = computed(() => { const x = new Date(); if (runDay.value === 'yesterday') x.setDate(x.getDate() - 1); return x.toLocaleDateString('sv-SE') })
+const runDayOptions = computed(() => [{ value: 'today' as const, label: t('common.today') }, { value: 'yesterday' as const, label: t('common.yesterday') }])
 function toggle(key: string) {
   const h = new Set(hidden.value)
   if (h.has(key)) h.delete(key)
@@ -341,6 +345,11 @@ const open = (id: string) => router.push(`/devices/${id}`)
       </ul>
       <div v-if="!todayQ.data.value" class="h-[200px] animate-pulse rounded-md bg-muted" />
       <EChart v-else :option="todayOption" :height="200" :label="t('overview.today')" />
+    </Section>
+
+    <Section :title="t('events.title')">
+      <template #actions><Segmented v-model="runDay" :options="runDayOptions" :label="t('events.dayLabel')" /></template>
+      <RunTimeline :day="runDayIso" />
     </Section>
 
     <Section :title="t('overview.daily')" :summary="dailySummary">

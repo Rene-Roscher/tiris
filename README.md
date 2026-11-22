@@ -80,6 +80,28 @@ proxy for anything else. With `TIRIS_PASSWORD` set, the UI and API require a log
 session cookie). Device actions that cut power (switch off, restart, firmware update) ask for confirmation, and
 protected devices refuse them on the server. Factory reset is not offered.
 
+## Running it somewhere else (VPS, cloud)
+
+tiris has to reach the plugs on your home network: it talks to each plug's local API and finds them by UDP
+broadcast. A server at a hosting provider cannot see your LAN, so on its own it cannot track anything. It works
+through a VPN:
+
+1. Connect the server to your home network with WireGuard or Tailscale (a router with WireGuard, or a small
+   always-on device at home as subnet router).
+2. Give the plugs fixed addresses (DHCP reservations in the router) and list them in `TIRIS_DISCOVERY_TARGETS`,
+   e.g. `192.168.1.40,192.168.1.41`. Broadcasts do not cross the tunnel; unicast discovery does.
+3. Set `TIRIS_PASSWORD` and put tiris behind a reverse proxy with HTTPS. Do not expose port 8080 directly; the
+   server then also holds your Tapo account credentials.
+
+What to expect: live polling is ten small requests every 2 s, a few kB/s; round trips of 20 to 40 ms over the
+tunnel are fine. When the tunnel drops, live samples are missing for that time, but history is not lost: each
+plug keeps about 10 days of 5-minute power and its hourly, daily and monthly energy, and tiris backfills them
+on the next fetch. Running tiris at home and only viewing it remotely (through the same VPN) is simpler and
+keeps the credentials at home.
+
+Only one tiris process may talk to the plugs per database. A second one (say, a test container on the same
+database) waits instead of polling: it would otherwise count energy twice and evict the first one's sessions.
+
 ## Development
 
 ```bash

@@ -27,6 +27,7 @@ export default {
     noTapoBody: 'Set TIRIS_TAPO_USERNAME and TIRIS_TAPO_PASSWORD in .env and restart tiris.',
     stale: 'As of {when}',
   },
+  events: { uncovered: 'No minute values before {time}', steady: 'On all the time, no separate runs: {list}',  title: 'What ran when', dayLabel: 'Day', peak: 'peak', none: 'No minute values for this day yet.', idle: 'No consumption: {names}', biggest: 'Biggest runs' },
   overview: { yesterday: 'Yesterday', legend: 'Show or hide devices', todayLine: '{kwh} kWh so far{eur} · yesterday by now {y} kWh', shareLabel: 'Share of energy, {days} days', rangeLabel: 'Range', cost: 'Cost', todayShort: 'today', peak: 'peak {day} with {value} kWh', last12: 'last 12 months {kwh} kWh{eur}', baseLoadLine: 'Base load {w} W around the clock, {eur} a year', baseLoadLineKwh: 'Base load {w} W around the clock, {kwh} kWh a year', vsMonthSameTime: 'vs. {month} at the same point', forecastOf: '{month} forecast', yearLine: 'Over a year {kwh} kWh{eur}', devicesSort: 'sorted by current power', sumPlugs: 'All plugs',
     title: 'Overview',
     allDevices: 'All devices',

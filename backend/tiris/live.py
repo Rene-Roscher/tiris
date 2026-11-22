@@ -14,12 +14,25 @@ import time
 from collections import deque
 from datetime import UTC, datetime
 
+import psycopg
 from psycopg_pool import ConnectionPool
 
 from .history import is_session_error
 from .plugs import PlugPool
 
 log = logging.getLogger("tiris.live")
+# One live poller per database: two would each add the energy since their own previous reading and count it twice.
+LOCK_KEY = 7_469_726_973   # "tiris"
+
+
+def try_lock(conninfo: str):
+    """Session-level advisory lock on a dedicated connection; it is held until that connection closes.
+    Returns the connection when the lock was taken, otherwise None."""
+    con = psycopg.connect(conninfo, autocommit=True)
+    if con.execute("SELECT pg_try_advisory_lock(%s)", (LOCK_KEY,)).fetchone()[0]:
+        return con
+    con.close()
+    return None
 
 BUFFER_S = 15 * 60
 MAX_GAP_S = 300
@@ -39,6 +52,7 @@ class LivePoller:
         self._pending: list[tuple] = []
         self._subs: set[asyncio.Queue] = set()
         self._task: asyncio.Task | None = None
+        self.lock_decided = asyncio.Event()   # set after the first attempt to take the poller lock
         self._last_flush = time.monotonic()
         self.errors: dict[str, str] = {}
         self._reload = True
@@ -60,6 +74,9 @@ class LivePoller:
             except asyncio.CancelledError:
                 pass
         await asyncio.to_thread(self._flush)
+        con = getattr(self, "_lock_con", None)
+        if con is not None:
+            con.close()
 
     def subscribe(self) -> asyncio.Queue:
         q: asyncio.Queue = asyncio.Queue(maxsize=5)
@@ -88,13 +105,42 @@ class LivePoller:
         except Exception as exc:
             log.warning("last energy counters not loaded: %s", exc)
 
+    @property
+    def owns_lock(self) -> bool:
+        con = getattr(self, "_lock_con", None)
+        return con is not None and not con.closed
+
+    async def _hold_lock(self) -> None:
+        """Wait until this process owns the poller lock (re-checked every minute, e.g. after a database restart)."""
+        while True:
+            con = getattr(self, "_lock_con", None)
+            if con is not None and not con.closed:
+                try:
+                    await asyncio.to_thread(con.execute, "SELECT 1")
+                    self.lock_decided.set()
+                    return
+                except Exception:
+                    log.warning("lost the live poller lock connection; taking it again")
+            try:
+                self._lock_con = await asyncio.to_thread(try_lock, self.db.conninfo)
+            except Exception:
+                log.exception("could not take the live poller lock")
+                self._lock_con = None
+            self.lock_decided.set()
+            if self._lock_con is not None:
+                return
+            log.warning("another tiris process is polling this database; live polling waits")
+            await asyncio.sleep(30)
+
     async def _run(self) -> None:
         last_dev_load = 0.0
+        await self._hold_lock()
         while True:
             tick = time.monotonic()
             try:
                 if self._reload or tick - last_dev_load > 60 or not self.devices:
                     self._reload = False
+                    await self._hold_lock()
                     await asyncio.to_thread(self._load_devices)
                     last_dev_load = tick
                 await self._poll_once()
