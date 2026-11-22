@@ -85,7 +85,15 @@ async def lifespan(_app: FastAPI):
     db.open_pool(s.database_url)
     _apply_retention()
     tasks: list[asyncio.Task] = []
-    if s.has_tapo:
+    if s.demo:
+        from . import demo
+        await asyncio.to_thread(demo.seed, db.pool())
+        state.plugs = demo.DemoPlugPool(s, db.pool())
+        state.devices = DeviceService(db.pool(), state.plugs)
+        state.live = LivePoller(db.pool(), state.plugs, s.live_interval_s)
+        state.live.start()
+        log.info("demo mode: simulated plugs, no collection")
+    elif s.has_tapo:
         state.plugs = PlugPool(s)
         state.devices = DeviceService(db.pool(), state.plugs)
         state.live = LivePoller(db.pool(), state.plugs, s.live_interval_s)

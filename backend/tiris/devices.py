@@ -115,6 +115,8 @@ class DeviceService:
 
     # ------------------------------------------------------------------ firmware (serial, own long-timeout client)
     async def _fw_handler(self, ip: str):
+        if getattr(self.plugs, "demo", False):
+            return await self.plugs.handler(ip)
         if self._fw_client is None:
             from tapo import ApiClient
             s = self.plugs.settings

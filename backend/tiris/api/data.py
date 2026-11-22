@@ -118,6 +118,11 @@ async def collect_now(backfill: bool = False):
         raise HTTPException(503, "no Tapo account configured")
     if state.collecting:
         raise HTTPException(409, "a collection is already running")
+    if getattr(state.plugs, "demo", False):     # demo: history is seeded; record a run so the UI has something to show
+        with pool().connection() as con:
+            con.execute("INSERT INTO runs (started_at, finished_at, status, devices_ok, devices_failed) "
+                        "VALUES (now(), now(), 'ok', (SELECT count(*) FROM devices), 0)")
+        return {"status": "ok", "demo": True}
     state.collecting = True
     try:
         return await collector.collect(pool(), state.plugs, force_backfill=backfill)

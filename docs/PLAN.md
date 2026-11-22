@@ -47,6 +47,7 @@ Consequences:
 | D8 | Security for a home lab: bind to the LAN, optional single password (session cookie), CSRF-safe JSON API, no secrets in the browser | a home lab needs little protection, but not none | no auth at all; full user management |
 | D9 | Costs model: meters (electricity, gas) with readings; tariffs with validity; installment plans with from/to dates; payments ledger; forecast = plugs measured + unmetered rest per day (additive, calibrated on meter intervals) | additive model matched the meter exactly in the prototype; proportional model mis-scaled summer AC | proportional coverage |
 | D10 | Name `tiris`; "Tapo" only in the description | "Tapo" is a TP-Link trademark | `tapo-view` |
+| D11 | Demo mode (`TIRIS_DEMO`): one behaviour model per made-up device seeds 14 months of history and drives simulated plugs | README images and a try-out without plugs, without anyone's real data | static screenshots of a real home |
 
 ## Data model (v1)
 

@@ -28,6 +28,8 @@ class Settings(BaseSettings):
     live_interval_s: float = 2.0          # the plug updates its power value about every 1.5 s [measured]
     collect_interval_min: int = 15
     raw_retention_days: int = 365         # raw 2-second samples; aggregates are kept forever
+    # Demo mode: made-up devices and history, no plugs or Tapo account needed (see tiris/demo.py).
+    demo: bool = False
     static_dir: str = ""                  # built web UI; empty = API only
 
     @property
@@ -40,7 +42,7 @@ class Settings(BaseSettings):
 
     @property
     def has_tapo(self) -> bool:
-        return bool(self.tapo_username and self.tapo_password)
+        return self.demo or bool(self.tapo_username and self.tapo_password)
 
 
 @lru_cache
