@@ -21,8 +21,9 @@ services:
       retries: 30
 
   tiris:
+    # pulls the released image; builds from this checkout if it cannot (or with `docker compose up --build`)
+    image: ghcr.io/rene-roscher/tiris:${TIRIS_VERSION:-latest}
     build: .
-    image: tiris:local
     restart: unless-stopped
     network_mode: host
     depends_on:

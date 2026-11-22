@@ -29,8 +29,8 @@ Supported: P110, P110M, P115, and the sockets of P304M / P316M (anything the
 The demo mode makes up seven devices with 14 months of history and live values:
 
 ```bash
-git clone <this repository> tiris && cd tiris
-docker compose -f docker-compose.demo.yml up --build
+git clone https://github.com/Rene-Roscher/tiris.git && cd tiris
+docker compose -f docker-compose.demo.yml up
 ```
 
 Open `http://localhost:8080` (another port: `TIRIS_HTTP_PORT=8095 docker compose -f docker-compose.demo.yml up`).
@@ -42,16 +42,17 @@ Discovery uses UDP broadcasts, so the app runs with host networking, which Docke
 does not offer.
 
 ```bash
-git clone <this repository> tiris && cd tiris
+git clone https://github.com/Rene-Roscher/tiris.git && cd tiris
 cp .env.example .env        # your Tapo account and your subnet broadcast, e.g. 192.168.1.255
-docker compose up -d --build
+docker compose up -d
 ```
 
-Open `http://<host>:8080`. The first fetch runs at start and reads as much history as the plugs keep; live values
+Open port 8080 of that machine, e.g. `http://raspberrypi.local:8080`. The first fetch runs at start and reads as much history as the plugs keep; live values
 appear within seconds. Then add your electricity meter, tariff and a meter reading under **Costs**.
 
-Prebuilt images for amd64 and arm64 are published to the GitHub container registry for every release
-(`ghcr.io/<owner>/tiris`); set `image:` in `docker-compose.yml` to use one instead of building.
+Both compose files use the prebuilt image `ghcr.io/rene-roscher/tiris` (amd64 and arm64, published for every
+release); they build from the checkout only if the image cannot be pulled, or with `docker compose up --build`.
+A fixed version: `TIRIS_VERSION=0.1.0 docker compose up -d`.
 
 ## Screenshots
 

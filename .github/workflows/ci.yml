@@ -75,7 +75,7 @@ jobs:
           context: .
           push: false
           load: true
-          tags: tiris:local
+          tags: ghcr.io/rene-roscher/tiris:ci   # the compose file's image name, so the smoke test runs this build
       - name: Smoke test in demo mode
         run: |
           docker compose -f docker-compose.demo.yml up -d --no-build
@@ -85,3 +85,4 @@ jobs:
           docker compose -f docker-compose.demo.yml down -v
         env:
           COMPOSE_PROJECT_NAME: tiris-ci
+          TIRIS_VERSION: ci

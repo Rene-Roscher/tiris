@@ -1,5 +1,5 @@
 # Try tiris without plugs: made-up devices with 14 months of history and live values.
-#   docker compose -f docker-compose.demo.yml up --build
+#   docker compose -f docker-compose.demo.yml up
 # then open http://localhost:8080 (another port: TIRIS_HTTP_PORT=8095 docker compose -f docker-compose.demo.yml up)
 name: tiris-demo
 
@@ -17,8 +17,8 @@ services:
       retries: 30
 
   tiris:
+    image: ghcr.io/rene-roscher/tiris:${TIRIS_VERSION:-latest}
     build: .
-    image: tiris:local
     depends_on:
       db:
         condition: service_healthy
