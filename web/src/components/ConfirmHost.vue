@@ -2,11 +2,10 @@
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import {
-  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
-  AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+  AlertDialog, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
+import { Button } from '@/components/ui/button'
 import { pending } from '@/composables/useConfirm'
-import { buttonVariants } from '@/components/ui/button'
 
 const { t } = useI18n()
 const open = computed({
@@ -29,10 +28,9 @@ function settle(ok: boolean) {
       </AlertDialogHeader>
       <pre v-if="pending.detail" class="max-h-48 overflow-auto whitespace-pre-wrap rounded-md bg-muted px-3 py-2 font-sans text-sm text-muted-foreground">{{ pending.detail }}</pre>
       <AlertDialogFooter>
-        <AlertDialogCancel type="button" @click="settle(false)">{{ t('common.cancel') }}</AlertDialogCancel>
-        <AlertDialogAction type="button" :class="pending.danger ? buttonVariants({ variant: 'destructive' }) : ''" @click="settle(true)">
-          {{ pending.action }}
-        </AlertDialogAction>
+        <!-- plain buttons: Reka's Action/Cancel close the dialog first, and that close used to answer "no" before the click said "yes" -->
+        <Button type="button" variant="outline" @click="settle(false)">{{ t('common.cancel') }}</Button>
+        <Button type="button" :variant="pending.danger ? 'destructive' : 'default'" @click="settle(true)">{{ pending.action }}</Button>
       </AlertDialogFooter>
     </AlertDialogContent>
   </AlertDialog>
