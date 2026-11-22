@@ -28,6 +28,7 @@ export default {
     stale: 'Stand {when}',
   },
   events: { uncovered: 'Keine Minutenwerte vor {time}', steady: 'Durchgehend an, ohne einzelne Läufe: {list}',  title: 'Wann lief was', dayLabel: 'Tag', peak: 'Spitze', none: 'Für diesen Tag gibt es noch keine Minutenwerte.', idle: 'Ohne Verbrauch: {names}', biggest: 'Größte Läufe' },
+  palette: { ctrl: 'Strg', title: 'Befehle', search: 'Suchen …', placeholder: 'Seite, Gerät oder Aktion suchen …', hint: 'Pfeiltasten zum Wählen, Enter zum Ausführen. Tippe einen Gerätenamen, um es zu schalten.', empty: 'Nichts gefunden', pages: 'Seiten', devices: 'Geräte', switch: 'Schalten', actions: 'Aktionen', turnOn: '{name} einschalten', turnOff: '{name} ausschalten' },
   overview: { yesterday: 'Gestern', legend: 'Geräte ein- und ausblenden', todayLine: '{kwh} kWh bisher{eur} · gestern bis jetzt {y} kWh', shareLabel: 'Anteile am Verbrauch, {days} Tage', rangeLabel: 'Zeitraum', cost: 'Kosten', todayShort: 'heute', peak: 'Spitze {day} mit {value} kWh', last12: 'letzte 12 Monate {kwh} kWh{eur}', baseLoadLine: 'Grundlast {w} W rund um die Uhr, {eur} im Jahr', baseLoadLineKwh: 'Grundlast {w} W rund um die Uhr, {kwh} kWh im Jahr', vsMonthSameTime: 'gegenüber {month} zur gleichen Zeit', forecastOf: 'Prognose {month}', yearLine: 'Aufs Jahr gerechnet {kwh} kWh{eur}', devicesSort: 'sortiert nach aktueller Leistung', sumPlugs: 'Summe der Plugs',
     title: 'Übersicht',
     allDevices: 'Alle Geräte',

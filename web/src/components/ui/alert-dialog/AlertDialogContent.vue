@@ -27,7 +27,7 @@ const forwarded = useForwardPropsEmits(delegatedProps, emits)
     <Transition name="t-fade">
     <AlertDialogOverlay
       data-slot="alert-dialog-overlay"
-      class=" fixed inset-0 z-confirm bg-black/80"
+      class="fixed inset-0 z-confirm bg-black/40 backdrop-blur-[2px] dark:bg-black/60"
     />
     </Transition>
     <Transition name="t-dialog">
@@ -36,7 +36,7 @@ const forwarded = useForwardPropsEmits(delegatedProps, emits)
       v-bind="{ ...$attrs, ...forwarded }"
       :class="
         cn(
-          'bg-background fixed top-[50%] left-[50%] z-confirm grid w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 rounded-lg border p-6 shadow-lg sm:max-w-lg',
+          'bg-background fixed top-[50%] left-[50%] z-confirm grid w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 rounded-xl border bg-popover p-5 shadow-float sm:max-w-md',
           props.class,
         )
       "

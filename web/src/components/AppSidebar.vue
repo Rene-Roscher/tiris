@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /** Sidebar on the canvas: brand with live total, navigation, the devices drawing power right now, settings. */
-import { Activity, LayoutDashboard, Plug, Settings, Wallet } from '@lucide/vue'
+import { Activity, LayoutDashboard, Plug, Search, Settings, Wallet } from '@lucide/vue'
 import { useQuery } from '@tanstack/vue-query'
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -9,6 +9,7 @@ import Logo from '@/components/Logo.vue'
 import { useLive } from '@/composables/useLive'
 import { api } from '@/lib/api'
 import { slotVar } from '@/lib/colors'
+import { isMac, paletteOpen } from '@/lib/palette'
 import { ago, watts } from '@/lib/format'
 import type { Device, Run } from '@/lib/types'
 
@@ -55,6 +56,12 @@ const navClass = (on: boolean) => on
     </div>
 
     <div class="flex flex-col gap-px">
+      <button type="button" class="mb-2 flex h-8 items-center gap-2.5 rounded-md border border-border bg-background px-2 text-sm text-caption shadow-xs transition-[color,border-color] hover:border-border-strong hover:text-foreground"
+              @click="paletteOpen = true; $emit('navigate')">
+        <Search class="size-4" aria-hidden="true" />{{ t('palette.search') }}
+        <span class="flex-1" aria-hidden="true" />
+        <kbd class="rounded-sm border border-border px-1 text-xs">{{ isMac ? '⌘' : t('palette.ctrl') }} K</kbd>
+      </button>
       <RouterLink
         v-for="i in items" :key="i.to" :to="i.to" @click="$emit('navigate')"
         :aria-current="isActive(i.to) ? 'page' : undefined"

@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { Menu } from '@lucide/vue'
+import { Menu, Search } from '@lucide/vue'
 import { onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { RouterView } from 'vue-router'
 import { Toaster } from 'vue-sonner'
 import AppSidebar from '@/components/AppSidebar.vue'
+import CommandPalette from '@/components/CommandPalette.vue'
 import ConfirmHost from '@/components/ConfirmHost.vue'
 import LoginScreen from '@/components/LoginScreen.vue'
 import Logo from '@/components/Logo.vue'
@@ -12,6 +13,7 @@ import { Button } from '@/components/ui/button'
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from '@/components/ui/sheet'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { useTheme } from '@/composables/useTheme'
+import { paletteOpen } from '@/lib/palette'
 
 const { t } = useI18n()
 useTheme()
@@ -43,6 +45,10 @@ const loggedIn = () => window.location.reload()
             </Button>
             <Logo />
             <span class="font-semibold">tiris</span>
+            <span class="flex-1" aria-hidden="true" />
+            <Button type="button" variant="ghost" size="icon-sm" :aria-label="t('palette.title')" @click="paletteOpen = true">
+              <Search class="size-4" aria-hidden="true" />
+            </Button>
           </header>
           <main class="w-full max-w-[1120px] flex-1 self-center px-4 pb-16 pt-4 md:px-10 md:pt-5">
             <RouterView />
@@ -57,6 +63,7 @@ const loggedIn = () => window.location.reload()
         <AppSidebar @navigate="mobileOpen = false" />
       </SheetContent>
     </Sheet>
+    <CommandPalette v-model:open="paletteOpen" />
     <ConfirmHost />
     <Toaster
       class="lp-toaster z-toast"
